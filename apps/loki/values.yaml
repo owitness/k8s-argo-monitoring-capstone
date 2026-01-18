@@ -41,6 +41,11 @@ loki:
   gateway:
     enabled: false
 
+  chunksCache:
+    enabled: false
+  resultsCache:
+    enabled: false
+
   monitoring:
     selfMonitoring:
       enabled: false
