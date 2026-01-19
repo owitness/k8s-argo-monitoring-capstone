@@ -127,17 +127,15 @@ async def startup():
     """Initialize database and test connections."""
     logger.info("Starting application...")
     
-    # Create MySQL tables
-    Base.metadata.create_all(bind=engine)
-    logger.info("MySQL tables created")
-    
-    # Test MySQL connection
+    # Test MySQL connection and create tables if available
     try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("MySQL tables created")
         with engine.connect() as conn:
             conn.exec_driver_sql("SELECT 1")
         logger.info("MySQL connection successful")
     except Exception as e:
-        logger.error(f"MySQL connection failed: {e}")
+        logger.warning(f"MySQL not available at startup (will retry on requests): {e}")
     
     # Test Redis connection
     try:
@@ -145,7 +143,9 @@ async def startup():
         r.ping()
         logger.info("Redis connection successful")
     except Exception as e:
-        logger.error(f"Redis connection failed: {e}")
+        logger.warning(f"Redis not available at startup (will retry on requests): {e}")
+    
+    logger.info("Application started - endpoints ready")
 
 
 # ---------------------------------------------------------------------------
@@ -189,42 +189,56 @@ def health():
 def get_items():
     """Get all items."""
     logger.info("Fetching all items")
-    db = SessionLocal()
     try:
-        items = db.query(Item).all()
-        return {"items": [{"id": i.id, "name": i.name, "description": i.description} for i in items]}
-    finally:
-        db.close()
+        db = SessionLocal()
+        try:
+            items = db.query(Item).all()
+            return {"items": [{"id": i.id, "name": i.name, "description": i.description} for i in items]}
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"MySQL error: {e}")
+        raise HTTPException(status_code=503, detail="MySQL unavailable")
 
 
 @app.get("/items/{item_id}")
 def get_item(item_id: int):
     """Get a single item by ID."""
     logger.debug(f"Looking up item: {item_id}")
-    db = SessionLocal()
     try:
-        item = db.query(Item).filter(Item.id == item_id).first()
-        if not item:
-            logger.warning(f"Item not found: {item_id}")
-            raise HTTPException(status_code=404, detail="Item not found")
-        return {"id": item.id, "name": item.name, "description": item.description}
-    finally:
-        db.close()
+        db = SessionLocal()
+        try:
+            item = db.query(Item).filter(Item.id == item_id).first()
+            if not item:
+                logger.warning(f"Item not found: {item_id}")
+                raise HTTPException(status_code=404, detail="Item not found")
+            return {"id": item.id, "name": item.name, "description": item.description}
+        finally:
+            db.close()
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"MySQL error: {e}")
+        raise HTTPException(status_code=503, detail="MySQL unavailable")
 
 
 @app.post("/items")
 def create_item(name: str, description: str = ""):
     """Create a new item."""
     logger.info(f"Creating item: {name}")
-    db = SessionLocal()
     try:
-        item = Item(name=name, description=description)
-        db.add(item)
-        db.commit()
-        db.refresh(item)
-        return {"id": item.id, "name": item.name, "description": item.description}
-    finally:
-        db.close()
+        db = SessionLocal()
+        try:
+            item = Item(name=name, description=description)
+            db.add(item)
+            db.commit()
+            db.refresh(item)
+            return {"id": item.id, "name": item.name, "description": item.description}
+        finally:
+            db.close()
+    except Exception as e:
+        logger.error(f"MySQL error: {e}")
+        raise HTTPException(status_code=503, detail="MySQL unavailable")
 
 
 @app.get("/slow")
@@ -276,9 +290,11 @@ def cache_get(key: str):
             raise HTTPException(status_code=404, detail="Key not found")
         logger.debug(f"Cache HIT: {key}")
         return {"key": key, "value": value}
-    except redis.RedisError as e:
-        logger.error(f"Redis error: {e}")
-        raise HTTPException(status_code=500, detail="Redis error")
+    except HTTPException:
+        raise
+    except (redis.RedisError, redis.ConnectionError) as e:
+        logger.error(f"Redis unavailable: {e}")
+        raise HTTPException(status_code=503, detail="Redis unavailable")
 
 
 @app.post("/cache/{key}")
@@ -289,9 +305,9 @@ def cache_set(key: str, value: str, ttl: int = 300):
         r = get_redis_client()
         r.setex(key, ttl, value)
         return {"key": key, "value": value, "ttl": ttl}
-    except redis.RedisError as e:
-        logger.error(f"Redis error: {e}")
-        raise HTTPException(status_code=500, detail="Redis error")
+    except (redis.RedisError, redis.ConnectionError) as e:
+        logger.error(f"Redis unavailable: {e}")
+        raise HTTPException(status_code=503, detail="Redis unavailable")
 
 
 @app.delete("/cache/{key}")
@@ -304,9 +320,11 @@ def cache_delete(key: str):
         if deleted == 0:
             raise HTTPException(status_code=404, detail="Key not found")
         return {"deleted": key}
-    except redis.RedisError as e:
-        logger.error(f"Redis error: {e}")
-        raise HTTPException(status_code=500, detail="Redis error")
+    except HTTPException:
+        raise
+    except (redis.RedisError, redis.ConnectionError) as e:
+        logger.error(f"Redis unavailable: {e}")
+        raise HTTPException(status_code=503, detail="Redis unavailable")
 
 
 @app.post("/cache/counter/{key}")
@@ -317,9 +335,9 @@ def cache_increment(key: str, amount: int = 1):
         r = get_redis_client()
         new_value = r.incrby(key, amount)
         return {"key": key, "value": new_value}
-    except redis.RedisError as e:
-        logger.error(f"Redis error: {e}")
-        raise HTTPException(status_code=500, detail="Redis error")
+    except (redis.RedisError, redis.ConnectionError) as e:
+        logger.error(f"Redis unavailable: {e}")
+        raise HTTPException(status_code=503, detail="Redis unavailable")
 
 
 @app.get("/cache/stats")
@@ -339,6 +357,6 @@ def cache_stats():
                 max(info.get("keyspace_hits", 0) + info.get("keyspace_misses", 0), 1) * 100, 2
             )
         }
-    except redis.RedisError as e:
-        logger.error(f"Redis error: {e}")
-        raise HTTPException(status_code=500, detail="Redis error")
+    except (redis.RedisError, redis.ConnectionError) as e:
+        logger.error(f"Redis unavailable: {e}")
+        raise HTTPException(status_code=503, detail="Redis unavailable")

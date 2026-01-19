@@ -7,7 +7,8 @@ tempo:
     # Enable metrics generator
     metricsGenerator:
       enabled: true
-      remoteWriteUrl: "http://prometheus-server.monitoring.svc.cluster.local:80/api/v1/write"
+      # prometheus chart server service name
+      remoteWriteUrl: "http://prometheus-server.monitoring.svc:80/api/v1/write"
 
     # Retention
     retention: 48h

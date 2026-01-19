@@ -1,8 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: grafana
+  name: storage-class
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-2"  # Install before everything else
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -10,16 +12,11 @@ spec:
   source:
     repoURL: https://github.com/d-blanco/k8s-argo-monitoring.git
     targetRevision: HEAD
-    path: apps/grafana
-    helm:
-      valueFiles:
-        - values.yaml
+    path: apps/storage-class
   destination:
     server: https://kubernetes.default.svc
-    namespace: monitoring
+    namespace: kube-system
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true

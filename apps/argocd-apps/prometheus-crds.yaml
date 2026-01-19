@@ -1,8 +1,10 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: grafana
+  name: prometheus-crds
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"  # Install CRDs before other apps
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
@@ -10,7 +12,7 @@ spec:
   source:
     repoURL: https://github.com/d-blanco/k8s-argo-monitoring.git
     targetRevision: HEAD
-    path: apps/grafana
+    path: apps/prometheus-crds
     helm:
       valueFiles:
         - values.yaml
@@ -23,3 +25,4 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+      - Replace=true  # CRDs need replace

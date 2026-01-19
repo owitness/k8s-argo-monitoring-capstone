@@ -1,18 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: prometheus-crds
+  name: prometheus
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "-1"  # Install CRDs before other apps
   finalizers:
     - resources-finalizer.argocd.argoproj.io
 spec:
   project: default
   source:
-    repoURL: https://github.com/YOUR_USERNAME/k8s-argo-monitoring.git
+    repoURL: https://github.com/YOUR_USERNAME/k8s-argo-monitoring.git  # Replace with your fork
     targetRevision: HEAD
-    path: apps/prometheus-crds
+    path: apps/prometheus
     helm:
       valueFiles:
         - values.yaml
@@ -25,4 +23,3 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-      - Replace=true  # CRDs need replace
