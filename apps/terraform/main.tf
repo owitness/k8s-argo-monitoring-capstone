@@ -110,13 +110,13 @@ module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 21.0"
 
-  cluster_name    = local.cluster_name
-  cluster_version = "1.33"
+  name            = local.cluster_name
+  kubernetes_version        = "1.33"
 
-  cluster_endpoint_public_access           = true
+  endpoint_public_access           = true
   enable_cluster_creator_admin_permissions = true
 
-  cluster_addons = {
+  addons = {
     eks-pod-identity-agent = {
       most_recent = true
     }
@@ -130,7 +130,7 @@ module "eks" {
   subnet_ids = module.vpc.private_subnets
 
   # Attach open security group to cluster
-  cluster_security_group_additional_rules = {
+  security_group_additional_rules = {
     ingress_all = {
       description = "All inbound - LAB ONLY"
       protocol    = "-1"
@@ -152,14 +152,10 @@ module "eks" {
     }
   }
 
-  eks_managed_node_group_defaults = {
-    ami_type = "AL2023_x86_64_STANDARD"
-  }
-
   eks_managed_node_groups = {
     one = {
       name = "node-group-1"
-
+      ami_type       = "AL2023_x86_64_STANDARD"
       instance_types = ["t3.large"]
 
       min_size     = 3
