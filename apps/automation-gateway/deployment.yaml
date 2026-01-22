@@ -1,0 +1,143 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: default
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: automation-gateway-secret
+  namespace: default
+type: Opaque
+stringData:
+  MYSQL_USER: "appuser"
+  MYSQL_PASSWORD: "apppassword"
+  REDIS_PASSWORD: ""
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: automation-gateway-config
+  namespace: default
+data:
+  MYSQL_HOST: "mysql.mysql.svc.cluster.local"
+  MYSQL_PORT: "3306"
+  MYSQL_DATABASE: "testdb"
+  REDIS_HOST: "redis.redis.svc.cluster.local"
+  REDIS_PORT: "6379"
+  # OpenTelemetry Configuration
+  OTEL_SERVICE_NAME: "automation-gateway"
+  OTEL_TRACES_EXPORTER: "otlp"
+  OTEL_METRICS_EXPORTER: "none"
+  OTEL_LOGS_EXPORTER: "none"
+  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://tempo.tempo.svc.cluster.local:4318/v1/traces"
+  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
+  OTEL_PYTHON_LOG_CORRELATION: "true"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: automation-gateway
+  namespace: default
+  labels:
+    app: automation-gateway
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: automation-gateway
+  template:
+    metadata:
+      labels:
+        app: automation-gateway
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "80"  # change if your port is different
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: automation-gateway
+          image: your-repo/your-image:latest
+          ports:
+            - containerPort: 80
+              name: http
+          envFrom:
+            - configMapRef:
+                name: automation-gateway-config
+            - secretRef:
+                name: automation-gateway-secret
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "256Mi"
+              cpu: "250m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 5
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 80
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: automation-gateway
+  namespace: default
+  labels:
+    app: automation-gateway
+spec:
+  type: ClusterIP
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+  selector:
+    app: automation-gateway
+---
+# Optional LoadBalancer service
+apiVersion: v1
+kind: Service
+metadata:
+  name: automation-gateway-lb
+  namespace: default
+  labels:
+    app: automation-gateway
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 80
+      targetPort: 80
+      name: http
+  selector:
+    app: automation-gateway
+---
+# Prometheus ServiceMonitor
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: automation-gateway
+  namespace: default
+  labels:
+    app: automation-gateway
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: automation-gateway
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - default
