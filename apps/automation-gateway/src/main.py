@@ -11,7 +11,7 @@ import time
 from typing import Optional
 
 import redis
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from prometheus_fastapi_instrumentator import Instrumentator
 from pydantic_settings import BaseSettings
 from sqlalchemy import Column, Integer, String, create_engine
