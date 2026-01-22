@@ -131,38 +131,32 @@ automation_job_queue_depth = Gauge(
 
 async def run_job(job_id: str):
     job = jobs[job_id]
-    action = job["action"]
-    # Increment queue depth when job starts
-    automation_job_queue_depth.inc()
-
     job["status"] = "RUNNING"
     job["started_at"] = datetime.utcnow().isoformat()
 
-    start_time = time.time()
+    # Increment queue depth
+    automation_job_queue_depth.inc()
+
     try:
-        # Simulate work
         await asyncio.sleep(random.uniform(1, 3))
-        # Simulate failure
         if random.random() < 0.1:
             raise Exception("Simulated failure")
         job["status"] = "SUCCESS"
         # Increment success counter
-        automation_jobs_total.labels(action=action, status="SUCCESS").inc()
+        automation_jobs_total.labels(action=job["action"], status="SUCCESS").inc()
     except Exception as e:
         job["status"] = "FAILED"
         job["error"] = str(e)
         # Increment failed counter
-        automation_jobs_total.labels(action=action, status="FAILED").inc()
+        automation_jobs_total.labels(action=job["action"], status="FAILED").inc()
     finally:
-        # Record duration
-        duration = time.time() - start_time
-        automation_job_duration_seconds.labels(action=action).observe(duration)
+        job["finished_at"] = datetime.utcnow().isoformat()
         # Decrement queue depth
         automation_job_queue_depth.dec()
-        job["finished_at"] = datetime.utcnow().isoformat()
 
-# In-memory job store
-jobs: Dict[str, Dict] = {}
+        # Record duration
+        duration = (datetime.fromisoformat(job["finished_at"]) - datetime.fromisoformat(job["started_at"])).total_seconds()
+        automation_job_duration_seconds.labels(action=job["action"]).observe(duration)
 
 # Request models
 class JobRequest(BaseModel):
@@ -207,43 +201,27 @@ Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 def healthz():
     return {"status": "ok"}
 
+# In-memory job store
+jobs: Dict[str, Dict] = {}
 # 2. Create a Job Run
-@app.post("/v1/jobs", response_model=JobResponse)
-async def create_job(job: JobRequest, background_tasks: BackgroundTasks):
-    job_id = str(uuid.uuid4())
-    job_entry = {
-        "job_id": job_id,
-        "action": job.action,
-        "target": job.target,
+@app.post("/v1/jobs")
+def create_job(job_data: JobCreate):
+    job_id = str(uuid.uuid4())  # generate a unique ID
+    job = {
+        "id": job_id,
+        "action": job_data.action,
+        "target": job_data.target,
+        "requested_by": job_data.requested_by,
+        "parameters": job_data.parameters,
         "status": "PENDING",
-        "started_at": None,
-        "finished_at": None,
-        "error": None
+        # other fields...
     }
-    jobs[job_id] = job_entry
+    jobs[job_id] = job
 
-    # Schedule the async job
-    background_tasks.add_task(run_job, job_id)
-    return {"job_id": job_id, "status": "PENDING"}
+    # Schedule the async job execution
+    asyncio.create_task(run_job(job_id))
 
-# Simulate async job execution
-async def run_job(job_id: str):
-    job = jobs[job_id]
-    job["status"] = "RUNNING"
-    job["started_at"] = datetime.utcnow().isoformat()
-
-    # Simulate different actions
-    try:
-        await asyncio.sleep(random.uniform(1, 3))  # simulate work
-        # Random failure simulation
-        if random.random() < 0.1:
-            raise Exception("Simulated failure")
-        job["status"] = "SUCCESS"
-    except Exception as e:
-        job["status"] = "FAILED"
-        job["error"] = str(e)
-    finally:
-        job["finished_at"] = datetime.utcnow().isoformat()
+    return {"job_id": job_id, "status": "created"}
 
 # 3. Get Job Status
 @app.get("/v1/jobs/{job_id}", response_model=JobStatusResponse)
