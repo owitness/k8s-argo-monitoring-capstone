@@ -8,7 +8,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://github.com/d-blanco/k8s-argo-monitoring.git
+    repoURL: https://github.com/LetsgoPens87/k8s-argo-monitoring.git
     targetRevision: HEAD
     path: apps/mysql
   destination:
