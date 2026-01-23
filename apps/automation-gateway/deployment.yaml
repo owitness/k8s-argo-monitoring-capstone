@@ -4,11 +4,6 @@ metadata:
   name: default
 ---
 apiVersion: v1
-kind: Namespace
-metadata:
-  name: automation-gateway
----
-apiVersion: v1
 kind: Secret
 metadata:
   name: automation-gateway-secret
