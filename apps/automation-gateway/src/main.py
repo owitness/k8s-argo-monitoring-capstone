@@ -212,32 +212,40 @@ def healthz():
 jobs: Dict[str, Dict] = {}
 # 2. Create a Job Run
 @app.post("/v1/jobs")
-async def create_job(job_data: JobCreate, background_tasks: BackgroundTasks):
-    job_id = str(uuid.uuid4())  # generate a unique ID
+async def create_job(job_data: JobCreate):
+    job_id = str(uuid.uuid4())
     job = {
         "id": job_id,
         "action": job_data.action,
         "target": job_data.target,
         "requested_by": job_data.requested_by,
-        "parameters": job_data.parameters,
+        "parameters": json.dumps(job_data.parameters),  # store as JSON string
         "status": "PENDING",
-        # other fields...
+        "created_at": datetime.utcnow().isoformat()
     }
-    jobs[job_id] = job
 
-    # Schedule the async job execution
-    background_tasks.add_task(run_job, job_id)
+    r = get_redis_client()
+    # Store the job info as a Redis hash
+    r.hset(f"job:{job_id}", mapping=job)
 
-    return {"job_id": job_id, "status": "created"}
+    # Enqueue the job for processing
+    r.lpush("job_queue", job_id)
+
+    return {"job_id": job_id, "status": "enqueued"}
 
 # 3. Get Job Status
-@app.get("/v1/jobs/{job_id}", response_model=JobStatusResponse)
+@app.get("/v1/jobs/{job_id}")
 def get_job_status(job_id: str):
-    job = jobs.get(job_id)
-    if not job:
+    r = get_redis_client()
+    job_data = r.hgetall(f"job:{job_id}")
+    if not job_data:
         raise HTTPException(status_code=404, detail="Job not found")
-    return job
-
+    # Convert bytes to str
+    job_data = {k.decode(): v.decode() for k, v in job_data.items()}
+    # Parse parameters JSON if needed
+    if "parameters" in job_data:
+        job_data["parameters"] = json.loads(job_data["parameters"])
+    return job_data
 
 @app.on_event("startup")
 async def startup():
