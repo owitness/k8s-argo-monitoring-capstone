@@ -1,0 +1,21 @@
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: example-application-updater
+  namespace: argocd
+spec:
+  namespace: argocd
+  commonUpdateSettings:
+    updateStrategy: "semver"
+  writeBackConfig:
+    method: "git"
+    gitConfig:
+      repository: "k8s-repo"
+      branch: "main"
+      writeBackTarget: "kustomization:."
+  applicationRefs:
+    - namePattern: "automation-gateway"
+      images:
+        - alias: "api"
+
+          imageName: "dhricko9/automation-gateway:v1.x"

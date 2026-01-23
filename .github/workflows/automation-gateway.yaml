@@ -3,9 +3,11 @@ name: CI/CD Pipeline
 on:
   push:
     branches:
-      - main  # or your default branch
+      - 'v*'  # or your default branch
     paths:
       - apps/automation-gateway/src/**
+    tags:
+      - 'v*'
 
 jobs:
   build-and-deploy:
@@ -14,6 +16,9 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
+      
+      - name: Set TAG_NAME
+        run: echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
