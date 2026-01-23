@@ -10,7 +10,7 @@ spec:
   writeBackConfig:
     method: "git"
     gitConfig:
-      repository: "k8s-repo"
+      repository: "https://github.com/LetsgoPens87/k8s-argo-monitoring.git"
       branch: "main"
       writeBackTarget: "kustomization:."
   applicationRefs:
