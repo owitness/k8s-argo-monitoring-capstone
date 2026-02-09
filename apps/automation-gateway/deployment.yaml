@@ -3,38 +3,6 @@ kind: Namespace
 metadata:
   name: automation-gateway
 ---
-apiVersion: v1
-kind: Secret
-metadata:
-  name: automation-gateway-secret
-  namespace: automation-gateway
-type: Opaque
-stringData:
-  MYSQL_USER: "appuser"
-  MYSQL_PASSWORD: "apppassword"
-  REDIS_PASSWORD: ""
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: automation-gateway-config
-  namespace: automation-gateway
-data:
-  MYSQL_HOST: "mysql.mysql.svc.cluster.local"
-  MYSQL_PORT: "3306"
-  MYSQL_DATABASE: "testdb"
-  REDIS_HOST: "redis.redis.svc.cluster.local"
-  REDIS_PORT: "6379"
-  # OpenTelemetry Configuration
-  OTEL_SERVICE_NAME: "automation-gateway-app"
-  OTEL_TRACES_EXPORTER: "otlp"
-  OTEL_METRICS_EXPORTER: "none"
-  OTEL_LOGS_EXPORTER: "none"
-  # Tempo standalone OTLP endpoint (using HTTP protocol on port 4318)
-  OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://tempo.tempo.svc.cluster.local:4318/v1/traces"
-  OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
-  OTEL_PYTHON_LOG_CORRELATION: "true"
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -58,16 +26,11 @@ spec:
     spec:
       containers:
         - name: automation-gateway
-          image: dhricko9/automation-gateway:v1.0.0  # Replace with your registry image
+          image: dhricko9/automation-gateway:v1.0.4  # Replace with your registry image
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
               name: http
-          envFrom:
-            - configMapRef:
-                name: automation-gateway-config
-            - secretRef:
-                name: automation-gateway-secret
           resources:
             requests:
               memory: "128Mi"
