@@ -16,24 +16,9 @@ spec:
       serviceAccountName: s3-sa 
       containers:
       - name: api
-        image: python:3.11-slim
-        command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+        image: dhricko9/automation-api:v1.0.0
         workingDir: /app
-        volumeMounts:
-        - name: code
-          mountPath: /app/app
         ports:
         - containerPort: 8000
-      volumes:
-      - name: code
-        configMap:
-          name: automation-api-code
----
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: automation-api-code
-  namespace: api
-data:
-  main.py: |-
-    # paste the content of main.py above here
+
+
