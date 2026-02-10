@@ -5,7 +5,7 @@ on:
     tags:
       - "v*"
     paths:
-      - apps/automation-api/src/**
+      - apps/automation-api/app/**
   workflow_dispatch:
     inputs:
       version:
@@ -36,7 +36,7 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image
-        run: docker build -t dhricko9/automation-api:${{ env.TAG_NAME }} apps/automation-api/src
+        run: docker build -t dhricko9/automation-api:${{ env.TAG_NAME }} apps/automation-api/app
 
       - name: Push Docker image
         run: docker push dhricko9/automation-api:${{ env.TAG_NAME }}
