@@ -3,4 +3,6 @@ uvicorn[standard]
 boto3>=1.26.0
 python-dotenv
 ansible-core>=2.12.0
+pyyaml>=6.0
+jinja2>=3.0.0
 

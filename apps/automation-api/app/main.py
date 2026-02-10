@@ -6,6 +6,8 @@ import subprocess
 import tempfile
 import os
 import logging
+import yaml
+from jinja2 import Environment, BaseLoader
 from pathlib import Path
 from typing import Optional, Dict
 
@@ -87,6 +89,80 @@ def download_from_s3(bucket: str, s3_path: str, local_path: str) -> bool:
         raise
 
 
+def render_jinja2_variables(variables: Dict) -> Dict:
+    """
+    Render Jinja2 templates in variable values using other variables in the dict.
+    Handles nested dictionaries and lists recursively.
+    """
+    try:
+        logger.info("Rendering Jinja2 templates in variables")
+        
+        # Create a Jinja2 environment
+        jinja_env = Environment(loader=BaseLoader())
+        
+        def process_value(value, context):
+            """Recursively process values to render Jinja2 expressions"""
+            if isinstance(value, str):
+                try:
+                    # Check if string contains Jinja2 expressions
+                    if "{{" in value or "{%" in value:
+                        template = jinja_env.from_string(value)
+                        rendered = template.render(context)
+                        logger.debug(f"Rendered: {value} → {rendered}")
+                        return rendered
+                    return value
+                except Exception as e:
+                    logger.warning(f"Failed to render template '{value}': {str(e)}")
+                    return value
+            elif isinstance(value, dict):
+                return {k: process_value(v, context) for k, v in value.items()}
+            elif isinstance(value, list):
+                return [process_value(item, context) for item in value]
+            else:
+                return value
+        
+        # First pass: create a context with all top-level variables
+        rendered_vars = {}
+        
+        # Process all values, using accumulated context
+        for key, value in variables.items():
+            rendered_value = process_value(value, variables)
+            rendered_vars[key] = rendered_value
+        
+        # Second pass: re-render to handle cross-references
+        final_vars = {}
+        for key, value in rendered_vars.items():
+            final_value = process_value(value, rendered_vars)
+            final_vars[key] = final_value
+        
+        logger.info(f"Successfully rendered Jinja2 templates for {len(final_vars)} variables")
+        return final_vars
+    except Exception as e:
+        logger.error(f"Error rendering Jinja2 templates: {str(e)}")
+        raise
+
+
+def load_yaml_vars(yaml_file_path: str) -> Dict:
+    """Load variables from a YAML file and render Jinja2 templates"""
+    try:
+        logger.info(f"Loading variables from YAML file: {yaml_file_path}")
+        with open(yaml_file_path, 'r') as f:
+            variables = yaml.safe_load(f)
+        if variables is None:
+            variables = {}
+        
+        logger.info(f"Loaded {len(variables)} variables from {yaml_file_path}")
+        
+        # Render Jinja2 templates in the variables
+        rendered_variables = render_jinja2_variables(variables)
+        
+        logger.info(f"Successfully loaded and rendered {len(rendered_variables)} variables")
+        return rendered_variables
+    except Exception as e:
+        logger.error(f"Error loading YAML file {yaml_file_path}: {str(e)}")
+        raise
+
+
 async def execute_ansible_playbook(
     playbook_path: str,
     inventory_path: str,
@@ -150,7 +226,7 @@ async def run_jcl(
     extra_vars: Optional[Dict] = None
 ):
     """
-    Run an Ansible playbook downloaded from S3, along with JCL file
+    Run an Ansible playbook downloaded from S3, along with JCL file and variables
     
     Parameters:
     - playbook_name: Name of the playbook file in S3 (e.g., ansible/create_hamlet_jcl.yml)
@@ -158,6 +234,10 @@ async def run_jcl(
     - jcl_file: JCL file name in jcl/ folder (e.g., GENER3)
     - s3_prefix: S3 path prefix (e.g., "ansible-files/") - optional
     - extra_vars: Extra variables to pass to ansible-playbook (e.g., {"target_host": "zos1"})
+    
+    Note: Automatically loads var.yml from S3 bucket root if it exists.
+    Variables from var.yml are passed to the playbook as environment_vars and other variables.
+    extra_vars parameter takes precedence over var.yml values.
     """
     job_id = str(uuid.uuid4())[:8]
     
@@ -192,17 +272,33 @@ async def run_jcl(
             logger.info(f"[{job_id}] Downloading JCL file from S3: {jcl_s3_path}")
             download_from_s3(S3_BUCKET, jcl_s3_path, jcl_local)
             
-            # Add JCL file path to extra vars for the playbook
+            # Download var.yml from S3 if it exists
+            var_s3_path = f"{s3_prefix}var.yml".lstrip("/")
+            var_local = os.path.join(tmpdir, "var.yml")
+            var_data = {}
+            
+            try:
+                logger.info(f"[{job_id}] Downloading variables from S3: {var_s3_path}")
+                download_from_s3(S3_BUCKET, var_s3_path, var_local)
+                var_data = load_yaml_vars(var_local)
+                logger.info(f"[{job_id}] Loaded variables from var.yml: {list(var_data.keys())}")
+            except Exception as e:
+                logger.warning(f"[{job_id}] Could not load var.yml (optional): {str(e)}")
+            
+            # Merge var.yml variables with extra_vars (extra_vars takes precedence)
             if extra_vars is None:
                 extra_vars = {}
-            extra_vars["jcl_file"] = jcl_local
+            merged_vars = {**var_data, **extra_vars}
+            merged_vars["jcl_file"] = jcl_local
+            
+            logger.info(f"[{job_id}] Final variables: {list(merged_vars.keys())}")
             
             # Execute ansible-playbook
             logger.info(f"[{job_id}] Executing ansible-playbook")
             execution_result = await execute_ansible_playbook(
                 playbook_local,
                 inventory_local,
-                extra_vars
+                merged_vars
             )
             
             return JSONResponse({
@@ -213,6 +309,8 @@ async def run_jcl(
                 "jcl_file": jcl_file,
                 "jcl_local_path": jcl_local,
                 "s3_bucket": S3_BUCKET,
+                "variables_loaded": list(var_data.keys()),
+                "variables_count": len(merged_vars),
                 "success": execution_result["success"],
                 "exit_code": execution_result["exit_code"],
                 "execution_id": execution_result["execution_id"],
