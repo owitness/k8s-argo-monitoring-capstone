@@ -90,6 +90,69 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 ```
 Open: https://localhost:8080
 
+## Build, test with Docker, and deploy (GitHub Actions → Argo CD)
+
+Use this flow to test the **automation-api** image locally, then push so GitHub Actions builds and pushes to Docker Hub; Argo CD (and Image Updater) will pick up the new image.
+
+### 1. Build and run with Docker (local test)
+
+From the repo root:
+
+```bash
+# Build the image (use your Docker Hub username or any tag for local test)
+docker build -t dhricko9/automation-api:test -f apps/automation-api/app/Dockerfile apps/automation-api/app
+
+# Run the container
+docker run -p 8000:8000 dhricko9/automation-api:test
+```
+
+In another terminal, test the API:
+
+```bash
+curl http://localhost:8000/health
+# Expect: {"status":"ok"}
+```
+
+Stop the container with `Ctrl+C` or `docker stop <container_id>`.
+
+### 2. Push to GitHub and trigger the pipeline
+
+The workflow in `.github/workflows/automation-gateway.yaml` builds **automation-api** (not automation-gateway). It runs when:
+
+- You **push a tag** `v*` (e.g. `v1.0.8`), or  
+- You **push changes** under `apps/automation-api/app/`, or  
+- You run it **manually** (Actions → "CI/CD Pipeline" → Run workflow, optional version input).
+
+**Option A – Push a version tag (recommended for releases):**
+
+```bash
+git add .
+git commit -m "Your changes"
+git push origin main
+
+# Then create and push a tag (this triggers the workflow and uses the tag as image tag)
+git tag v1.0.8
+git push origin v1.0.8
+```
+
+**Option B – Manual run (no tag):**
+
+1. Go to GitHub → **Actions** → **CI/CD Pipeline** → **Run workflow**.
+2. Choose branch, optionally set "Docker image tag" (e.g. `v1.0.8`). If left empty, the image tag will be `latest` (or the tag if the run was triggered by a tag).
+
+**Secrets:** In the repo **Settings → Secrets and variables → Actions**, set `DOCKER_USERNAME` and `DOCKER_PASSWORD` (Docker Hub) so the workflow can push.
+
+### 3. How Argo CD gets the new image
+
+- **If Argo CD Image Updater is installed:** It watches the registry, finds newer semver tags (e.g. `v1.0.8`), and writes the new tag into `apps/automation-api/kustomization.yaml` in the Git repo, then Argo CD syncs from Git.
+- **If you prefer to pin manually:** After the workflow has pushed (e.g. `dhricko9/automation-api:v1.0.8`), update `apps/automation-api/kustomization.yaml` and set `newTag` to that tag (e.g. `v1.0.8`), then commit and push. Argo CD will sync and deploy the new image.
+
+To confirm what is deployed:
+
+```bash
+kubectl get deployment automation-api -n automation-api -o jsonpath='{.spec.template.spec.containers[0].image}'
+```
+
 ## Directory Structure
 
 ```

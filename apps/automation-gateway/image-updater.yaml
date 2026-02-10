@@ -1,7 +1,7 @@
 apiVersion: argocd-image-updater.argoproj.io/v1alpha1
 kind: ImageUpdater
 metadata:
-  name: example-application-updater
+  name: automation-gateway-updater
   namespace: argocd
 spec:
   namespace: argocd
@@ -16,6 +16,5 @@ spec:
   applicationRefs:
     - namePattern: "automation-gateway"
       images:
-        - alias: "api"
-
+        - alias: "automation-gateway"
           imageName: "dhricko9/automation-gateway:v1.x"
