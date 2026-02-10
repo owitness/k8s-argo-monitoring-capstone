@@ -16,6 +16,8 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write   # so we can push the kustomization.yaml update
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -42,11 +44,34 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
         with:
-          context: apps/automation-api/app          # ← this folder contains your dockerfile + main.py + requirements.txt
-          file: apps/automation-api/app/Dockerfile  # ← explicit path to your lowercase-named file
+          context: apps/automation-api/app
+          file: apps/automation-api/app/Dockerfile
           push: true
           tags: |
             dhricko9/automation-api:${{ env.TAG_NAME }}
-          # Optional but recommended: enable caching for faster future builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Update kustomization.yaml so Argo CD deploys the image we just pushed
+      - name: Checkout main to update manifest
+        if: env.TAG_NAME != ''
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update image tag in kustomization
+        if: env.TAG_NAME != ''
+        run: |
+          # Replace newTag in apps/automation-api/kustomization.yaml with the tag we just pushed
+          sed -i "s/newTag: .*/newTag: ${{ env.TAG_NAME }}/" apps/automation-api/kustomization.yaml
+          cat apps/automation-api/kustomization.yaml
+
+      - name: Commit and push kustomization update
+        if: env.TAG_NAME != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add apps/automation-api/kustomization.yaml
+          git diff --staged --quiet || git commit -m "chore(automation-api): set image tag to ${{ env.TAG_NAME }}"
+          git push

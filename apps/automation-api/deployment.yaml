@@ -16,7 +16,7 @@ spec:
       serviceAccountName: s3-sa 
       containers:
       - name: api
-        image: dhricko9/automation-api:v1.0.11
+        image: dhricko9/automation-api:1.0.9
         workingDir: /app
         ports:
         - containerPort: 8000
