@@ -49,4 +49,8 @@ jobs:
             dhricko9/automation-api:${{ env.TAG_NAME }}
           # Optional but recommended: enable caching for faster future builds
           cache-from: type=gha
+<<<<<<< HEAD
           cache-to: type=gha,mode=max
+=======
+          cache-to: type=gha,mode=max
+>>>>>>> 88f5fb2e496d369135dc5d6ef54dd49726836d8e
