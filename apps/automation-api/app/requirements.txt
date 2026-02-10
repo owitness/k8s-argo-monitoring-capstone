@@ -3,3 +3,4 @@ uvicorn[standard]
 boto3>=1.26.0
 python-dotenv
 ansible-core>=2.12.0
+ansible-collections.ibm.ibm_zos_core

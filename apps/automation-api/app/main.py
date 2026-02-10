@@ -19,30 +19,47 @@ app = FastAPI(title="Automation Control Plane - Ansible Runner")
 S3_BUCKET = "ansible-playbook-s3-dae"
 s3_client = boto3.client('s3')
 
-# Install Ansible Collections on startup
+def is_collection_installed(collection_name):
+    try:
+        result = subprocess.run(
+            ["ansible-galaxy", "collection", "list"],
+            capture_output=True,
+            text=True,
+            timeout=60
+        )
+        output = result.stdout
+        # Check if collection name appears in output
+        return collection_name in output
+    except Exception as e:
+        logger.error(f"Error checking collections: {str(e)}")
+        return False
+
 def install_ansible_collections():
-    """Install required Ansible collections"""
     collections = [
-        "ibm.zos",
+        "ibm.ibm_zos_core",
         "community.general",
         "ansible.posix"
     ]
-    
     for collection in collections:
         try:
-            logger.info(f"Checking Ansible collection: {collection}")
+            if is_collection_installed(collection):
+                logger.info(f"Collection '{collection}' already installed.")
+                continue
+            logger.info(f"Installing collection: {collection}")
             result = subprocess.run(
                 ["ansible-galaxy", "collection", "install", collection, "--upgrade"],
                 capture_output=True,
                 text=True,
                 timeout=300
             )
+            logger.info(f"stdout: {result.stdout}")
+            logger.info(f"stderr: {result.stderr}")
             if result.returncode == 0:
-                logger.info(f"Successfully installed/updated collection: {collection}")
+                logger.info(f"Successfully installed {collection}")
             else:
-                logger.warning(f"Warning installing {collection}: {result.stderr}")
+                logger.warning(f"Failed to install {collection}: {result.stderr}")
         except Exception as e:
-            logger.error(f"Error installing collection {collection}: {str(e)}")
+            logger.error(f"Error installing {collection}: {str(e)}")
 
 # Health Endpoint
 @app.get("/health")
