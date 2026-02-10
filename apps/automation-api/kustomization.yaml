@@ -6,4 +6,4 @@ resources:
   - image-updater.yaml
 images:
   - name: dhricko9/automation-api
-    newTag: v1.0.13
+    newTag: v1.0.14
