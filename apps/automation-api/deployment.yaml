@@ -2,7 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: automation-api
-  namespace: automation
+  namespace: api
 spec:
   replicas: 1
   selector:
@@ -13,6 +13,7 @@ spec:
       labels:
         app: automation-api
     spec:
+      serviceAccountName: s3-sa 
       containers:
       - name: api
         image: python:3.11-slim
@@ -32,7 +33,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: automation-api-code
-  namespace: automation
+  namespace: api
 data:
   main.py: |-
     # paste the content of main.py above here
