@@ -51,7 +51,11 @@ spec:
       - name: api
         volumeMounts:
         - name: config-vol
-          mountPath: /app
+          mountPath: /app/config/var.yml
+          subPath: var.yml
+        - name: config-vol
+          mountPath: /app/config/inventory.yml
+          subPath: inventory.yml
         image: dhricko9/automation-api:1.0.9
         workingDir: /app
         ports:
