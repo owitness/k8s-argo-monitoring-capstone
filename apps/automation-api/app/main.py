@@ -5,6 +5,7 @@ import boto3
 import subprocess
 import tempfile
 import os
+import paramiko
 import stat
 import shutil
 import logging
