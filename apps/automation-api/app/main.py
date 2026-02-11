@@ -19,7 +19,7 @@ def ping():
         # run_command returns (rc, stdout, stderr) in that order
         rc, out, err = ansible_runner.run_command(
             executable_cmd="ansible-playbook",
-            cmdline_args=["ping.yml", "-i", "zos.ini"],
+            cmdline_args=["ping.yml", "-i", "zos.yaml"],
             host_cwd=ANSIBLE_DIR,
         )
         if out:
