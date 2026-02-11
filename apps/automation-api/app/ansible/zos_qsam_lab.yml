@@ -1,0 +1,87 @@
+---
+- name: z/OS QSAM Dataset Operations Lab
+  hosts: zos_host
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment:
+    _BPXK_AUTOCVT: "ON"
+    LANG: "C"
+    _TAG_REDIR_ERR: "txt"
+    _TAG_REDIR_IN: "txt"
+    _TAG_REDIR_OUT: "txt"
+    _CEE_RUNOPTS: "FILETAG(AUTOCVT,AUTOTAG) POSIX(ON)"
+    ZOAU_ROOT: "/usr/lpp/IBM/zoautil"
+    ZOAU_HOME: "/usr/lpp/IBM/zoautil"
+    PATH: "/usr/lpp/IBM/zoautil/bin:/usr/lpp/IBM/cyp/v3r9/pyz/bin:/bin:/var/bin:$PATH"
+    PYTHONPATH: "/usr/lpp/IBM/zoautil/lib"
+    LIBPATH: "/usr/lpp/IBM/zoautil/lib:/usr/lpp/IBM/cyp/v3r9/pyz/lib:/lib:/usr/lib:."
+
+  vars:
+    source_dataset: "GAMA09.QSAM1"
+    target_dataset: "GAMA09.QSAM2"
+    jcl_local_path: "./jcl"
+    fetch_dest: "/tmp/QSAM2_downloaded"
+
+  tasks:
+    # Task 1: Copy one QSAM dataset to another QSAM
+    - name: Copy QSAM to QSAM
+      ibm.ibm_zos_core.zos_copy:
+        src: "{{ source_dataset }}"
+        dest: "{{ target_dataset }}"
+        remote_src: true
+        force: true
+      register: result
+
+    # Task 2: Display result
+    - name: Display copy result
+      debug:
+        msg: "{{ result }}"
+
+    # Task 3: Fetch dataset contents
+    - name: Fetch dataset
+      ibm.ibm_zos_core.zos_fetch:
+        src: "{{ target_dataset }}"
+        dest: "{{ fetch_dest }}"
+        flat: true
+
+    # Task 4: Display dataset contents
+    - name: Display dataset contents
+      debug:
+        msg: "{{ lookup('file', fetch_dest) }}"
+
+    # Bonus: Submit JCL jobs from the repo
+    - name: Copy JCL files to z/OS
+      ibm.ibm_zos_core.zos_copy:
+        src: "{{ item }}"
+        dest: "/tmp/ansible-gama09/{{ item | basename }}"
+      loop:
+        - "{{ jcl_local_path }}/CRQSAM1.jcl"
+        - "{{ jcl_local_path }}/CRQSAM2.jcl"
+      when: false  # Set to true if you want to submit JCL
+
+    - name: Submit CRQSAM1 JCL
+      ibm.ibm_zos_core.zos_job_submit:
+        src: "/tmp/ansible-gama09/CRQSAM1.jcl"
+        location: USS
+        wait_time_s: 60
+      register: crqsam1_result
+      when: false  # Set to true if you want to submit JCL
+
+    - name: Display CRQSAM1 job result
+      debug:
+        var: crqsam1_result
+      when: false  # Set to true if you want to submit JCL
+
+    - name: Submit CRQSAM2 JCL
+      ibm.ibm_zos_core.zos_job_submit:
+        src: "/tmp/ansible-gama09/CRQSAM2.jcl"
+        location: USS
+        wait_time_s: 60
+      register: crqsam2_result
+      when: false  # Set to true if you want to submit JCL
+
+    - name: Display CRQSAM2 job result
+      debug:
+        var: crqsam2_result
+      when: false  # Set to true if you want to submit JCL

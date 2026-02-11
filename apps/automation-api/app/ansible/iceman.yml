@@ -1,0 +1,146 @@
+---
+- name: Lab 27 - Create input datasets, upload data from local ONE/TWO, run ICEMAN (DFSORT)
+  hosts: zos_host
+  collections:
+    - ibm.ibm_zos_core
+  gather_facts: false
+  environment: "{{ environment_vars }}"
+
+  vars:
+    input_ds1: "GAMA09.LAB27.CITIES1"
+    input_ds2: "GAMA09.LAB27.CITIES2"
+    output_ds: "GAMA09.LAB27.SORTED.CITIES"
+    sysout_ds: "GAMA09.LAB27.ICEMAN.SYSOUT"
+
+  tasks:
+
+    - name: Create first input dataset (sequential)
+      zos_data_set:
+        name: "{{ input_ds1 }}"
+        type: seq
+        state: present
+        format: fb
+        record_length: 43
+        block_size: 27920
+        space_primary: 1
+        space_secondary: 1
+        space_type: trk
+
+    - name: Upload content to first input dataset from local ONE
+      zos_copy:
+        src: "{{ playbook_dir }}/../data/ONE"
+        dest: "{{ input_ds1 }}"
+        remote_src: false
+        force: true
+        encoding:
+          from: UTF-8
+          to: IBM-1047
+
+    - name: Create second input dataset (sequential)
+      zos_data_set:
+        name: "{{ input_ds2 }}"
+        type: seq
+        state: present
+        format: fb
+        record_length: 43
+        block_size: 27920
+        space_primary: 1
+        space_secondary: 1
+        space_type: trk
+
+    - name: Upload content to second input dataset from local TWO
+      zos_copy:
+        src: "{{ playbook_dir }}/../data/TWO"
+        dest: "{{ input_ds2 }}"
+        remote_src: false
+        force: true
+        encoding:
+          from: UTF-8
+          to: IBM-1047
+
+    - name: Verify input datasets exist
+      zos_find:
+        patterns:
+          - "{{ input_ds1 }}"
+          - "{{ input_ds2 }}"
+      register: found_datasets
+
+    - name: Show found input datasets
+      debug:
+        msg: "Found datasets: {{ found_datasets.data_sets | map(attribute='name') | list }}"
+
+    - name: Delete previous output dataset if it exists (cleanup)
+      zos_data_set:
+        name: "{{ output_ds }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Execute ICEMAN (DFSORT) - concatenate, sort descending by population, dedup, reformat
+      zos_mvs_raw:
+        program_name: ICEMAN
+        auth: false
+        parm: ''
+        dds:
+          - dd_concat:
+              dd_name: SORTIN
+              dds:
+                - dd_data_set:
+                    data_set_name: "{{ input_ds1 }}"
+                    disposition: shr
+                - dd_data_set:
+                    data_set_name: "{{ input_ds2 }}"
+                    disposition: shr
+
+          - dd_data_set:
+              dd_name: SORTOUT
+              data_set_name: "{{ output_ds }}"
+              disposition: mod
+              space_primary: 5
+              space_secondary: 5
+              space_type: trk
+              record_format: fb
+              record_length: 30
+              block_size: 0
+
+          - dd_input:
+              dd_name: SYSIN
+              content: |
+                SORT FIELDS=(37,7,ZD,D)
+                SUM FIELDS=NONE
+                OUTREC FIELDS=(35,2,15,20,37,7,TO=ZD,LENGTH=8)
+
+          - dd_data_set:
+              dd_name: SYSOUT
+              data_set_name: "{{ sysout_ds }}"
+              disposition: mod
+              space_primary: 1
+              space_secondary: 1
+              space_type: trk
+              record_format: vb
+              record_length: 137
+
+          - dd_dummy:
+              dd_name: SYSUDUMP
+
+      register: dfsort_result
+
+    - name: Display ICEMAN return code and messages
+      debug:
+        msg: |
+          RC = {{ dfsort_result.ret_code.code }}
+          Full result: {{ dfsort_result }}
+
+    - name: Assert successful completion
+      assert:
+        that: dfsort_result.ret_code.code | int <= 4
+        fail_msg: "DFSORT failed with RC={{ dfsort_result.ret_code.code }} — check {{ sysout_ds }} for details"
+        success_msg: "Lab 27 completed successfully (RC={{ dfsort_result.ret_code.code }})"
+
+    - name: Inform about final output
+      debug:
+        msg: |
+          Sorted output is in dataset: {{ output_ds }}
+          Format:
+            1-2   : State postal abbreviation
+            3-22  : City name
+           23-30  : City population (8 positions, right-justified)

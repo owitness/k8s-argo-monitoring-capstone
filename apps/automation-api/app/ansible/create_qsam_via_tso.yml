@@ -1,0 +1,22 @@
+---
+# This playbook uses zos_tso_command to create a QSAM data set
+# on the z/OS instance.
+
+- name: Submit a TSO command to create a QSAM data set
+  hosts: zos
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+
+  tasks:
+
+    - name: Create a data set using TSO ALLOC
+      ibm.ibm_zos_core.zos_tso_command:
+        commands:
+          - ALLOC DA(QSAM2) NEW CATALOG SPACE(1 1) TRACKS DSORG(PS) RECFM(F) LRECL(80) BLKSIZE(800)
+      register: result
+
+    - name: Display result of data set creation
+      debug:
+        msg: "{{ result }}"

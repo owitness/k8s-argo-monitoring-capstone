@@ -1,0 +1,53 @@
+---
+- name: Submit GENER1 job and save SYSUT2 output
+  hosts: zos_host
+  gather_facts: no
+  environment:
+    _BPXK_AUTOCVT: ON
+    ZOAU_HOME: /usr/lpp/IBM/zoautil
+    LIBPATH: /usr/lpp/IBM/zoautil/lib:/usr/lpp/IBM/cyp/v3r11/pyz/lib:/lib:/usr/lib
+    PATH: /usr/lpp/IBM/zoautil/bin:/usr/lpp/IBM/cyp/v3r11/pyz/bin:/bin:/usr/bin
+  tasks:
+    - name: Submit GENER1 JCL (force no-op encoding)
+      ibm.ibm_zos_core.zos_job_submit:
+        src: "GAMA09.JCL(GENER1)"
+        location: DATA_SET
+        wait: true
+        wait_time_s: 60
+        return_output: true
+        encoding:
+          from: IBM-1047
+          to: IBM-1047
+      register: gener1_result
+      ignore_errors: true   # temporary, to see full result
+
+    - name: Show complete job result
+      debug:
+        var: gener1_result
+
+    - name: Show available DD names if job succeeded
+      debug:
+        msg: "DD names: {{ gener1_result.jobs[0].ddnames | map(attribute='ddname') | list | default('No DDs - job failed') }}"
+      when: not gener1_result.failed | default(false)
+
+    - name: Extract SYSUT2 if present
+      set_fact:
+        sysut2_content: >-
+          {{ gener1_result.jobs[0].ddnames 
+             | selectattr('ddname', 'equalto', 'SYSUT2') 
+             | map(attribute='content') 
+             | first 
+             | default(['No SYSUT2']) 
+             | join('\n') }}
+      when: not gener1_result.failed | default(false)
+
+    - name: Save SYSUT2 locally
+      ansible.builtin.copy:
+        content: "{{ sysut2_content | default('Job failed - no output') }}"
+        dest: "./gener1_sysut2.txt"
+      delegate_to: localhost
+      when: not gener1_result.failed | default(false)
+
+    - name: Confirmation
+      debug:
+        msg: "Done. Check ./gener1_sysut2.txt"

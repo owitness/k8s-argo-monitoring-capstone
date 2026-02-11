@@ -1,0 +1,64 @@
+---
+- name: Conditionally delete and define a GDG + model DSCB
+  hosts: zos_host
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+  tasks:
+    - name: Delete and define GDG base using IDCAMS
+      zos_mvs_raw:
+        program_name: IDCAMS
+        auth: true
+        dds:
+          - dd_output:
+              dd_name: SYSPRINT
+              return_content:
+                type: text
+          - dd_input:
+              dd_name: SYSIN
+              content: |
+                DELETE GAMA09.TEST.GDG GDG
+                SET MAXCC = 0
+                IF LASTCC < 9 THEN -
+                  DEFINE GDG ( -
+                    NAME(GAMA09.TEST.GDG) -
+                    LIMIT(50) -
+                    NOEMPTY -
+                    SCRATCH -
+                  )
+      register: idcams_gdg_result
+
+    - name: Show full IDCAMS GDG result
+      debug:
+        var: idcams_gdg_result
+
+    # Lab 24: Create model DSCB
+    - name: Define model DSCB for GDG generations (idempotent)
+      zos_mvs_raw:
+        program_name: IDCAMS
+        auth: true
+        dds:
+          - dd_output:
+              dd_name: SYSPRINT
+              return_content:
+                type: text
+          - dd_input:
+              dd_name: SYSIN
+              content: |
+                SET MAXCC = 0
+                DEFINE NONVSAM ( -
+                  NAME(GAMA09.TEST.GDG.MODEL) -
+                  RECORG(PS) -
+                  LRECL(80) -
+                  BLKSIZE(27920) -
+                  RECFM(FB) -
+                )
+                IF LASTCC = 8 THEN -
+                  SET MAXCC = 0
+      register: idcams_model_result
+      changed_when: false
+
+    - name: Show IDCAMS model DSCB result
+      debug:
+        var: idcams_model_result

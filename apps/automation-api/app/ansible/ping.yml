@@ -1,0 +1,16 @@
+---
+- name: Ping z/OS 
+  hosts: zos_host
+  collections:
+    - ibm.ibm_zos_core
+  gather_facts: false
+  environment: "{{environment_vars}}"
+
+  tasks:
+    - name: Pinging Host 
+      ping: {}
+      register: result 
+
+    - name: Response 
+      debug:
+        msg: "{{ result.ping }}"      

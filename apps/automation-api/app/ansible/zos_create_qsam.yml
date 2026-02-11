@@ -1,0 +1,43 @@
+---
+- name: Check and Create QSAM Datasets
+  hosts: zos_host
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+
+  tasks:
+    # Check if source dataset exists
+    - name: Check if GAMA09.QSAM exists
+      ibm.ibm_zos_core.zos_data_set:
+        name: GAMA09.QSAM
+        state: present
+        type: seq
+        record_format: fb
+        record_length: 80
+        block_size: 800
+        space_primary: 1
+        space_secondary: 1
+        space_type: trk
+        replace: false
+      register: qsam_check
+      ignore_errors: true
+
+    - name: Display dataset check result
+      debug:
+        var: qsam_check
+
+    # Create sample data in source dataset if it was just created
+    - name: Add sample data to GAMA09.QSAM
+      ibm.ibm_zos_core.zos_copy:
+        content: |
+          This is line 1 of sample data
+          This is line 2 of sample data
+          This is line 3 of sample data
+          End of sample data
+        dest: GAMA09.QSAM
+        force: true
+      when: qsam_check.changed
+
+    - name: Confirm source dataset is ready
+      debug:
+        msg: "GAMA09.QSAM is ready for copying"

@@ -1,0 +1,22 @@
+---
+# This playbook uses zos_tso_command to discover which PROCs
+# are included in this z/OS installation's default PROCLIB.
+
+- name: List members in SYS1.PROCLIB
+  hosts: zos
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+
+  tasks:
+
+    - name: List members in SYS1.PROCLIB
+      zos_tso_command:
+        commands:
+          - LISTDS 'SYS1.PROCLIB' MEMBERS
+      register: result
+
+    - name: Display result
+      debug:
+        msg: "{{ result }}"

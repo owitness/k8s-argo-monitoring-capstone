@@ -1,0 +1,145 @@
+---
+- name: Complete z/OS QSAM Lab - Create and Copy Datasets
+  hosts: zos_host
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment:
+    _BPXK_AUTOCVT: "ON"
+    LANG: "C"
+    _TAG_REDIR_ERR: "txt"
+    _TAG_REDIR_IN: "txt"
+    _TAG_REDIR_OUT: "txt"
+    _CEE_RUNOPTS: "FILETAG(AUTOCVT,AUTOTAG) POSIX(ON)"
+    ZOAU_ROOT: "/usr/lpp/IBM/zoautil"
+    ZOAU_HOME: "/usr/lpp/IBM/zoautil"
+    PATH: "/usr/lpp/IBM/zoautil/bin:/usr/lpp/IBM/cyp/v3r9/pyz/bin:/bin:/var/bin:$PATH"
+    PYTHONPATH: "/usr/lpp/IBM/zoautil/lib"
+    LIBPATH: "/usr/lpp/IBM/zoautil/lib:/usr/lpp/IBM/cyp/v3r9/pyz/lib:/lib:/usr/lib:."
+
+  vars:
+    jcl_local_path: "../jcl"  # Relative to ansible directory
+    source_dataset: "GAMA09.QSAM"
+    target_dataset: "GAMA09.QSAM2"
+
+  tasks:
+    # ========================================
+    # STEP 1: Submit JCL to create datasets
+    # ========================================
+
+    - name: Copy CRQSAM1 JCL to z/OS USS
+      ibm.ibm_zos_core.zos_copy:
+        src: "{{ jcl_local_path }}/CRQSAM1"
+        dest: "/tmp/ansible-gama09/CRQSAM1.jcl"
+        force: true
+        encoding:
+          from: ISO8859-1
+          to: IBM-1047
+
+    - name: Submit CRQSAM1 JCL to create GAMA09.QSAM
+      ibm.ibm_zos_core.zos_job_submit:
+        src: "/tmp/ansible-gama09/CRQSAM1.jcl"
+        location: USS
+        wait_time_s: 30
+      register: crqsam1_result
+
+    - name: Display CRQSAM1 job result
+      debug:
+        msg: |
+          Job Name: {{ crqsam1_result.jobs[0].job_name | default('N/A') }}
+          Job ID: {{ crqsam1_result.jobs[0].job_id | default('N/A') }}
+          Return Code: {{ crqsam1_result.jobs[0].ret_code | default('N/A') }}
+          Status: {{ 'SUCCESS' if crqsam1_result.jobs[0].ret_code.msg == 'CC 0000' else 'CHECK OUTPUT' }}
+
+    - name: Copy CRQSAM2 JCL to z/OS USS
+      ibm.ibm_zos_core.zos_copy:
+        src: "{{ jcl_local_path }}/CRQSAM2"
+        dest: "/tmp/ansible-gama09/CRQSAM2.jcl"
+        force: true
+        encoding:
+          from: ISO8859-1
+          to: IBM-1047
+
+    - name: Submit CRQSAM2 JCL to create GAMA09.QSAM2
+      ibm.ibm_zos_core.zos_job_submit:
+        src: "/tmp/ansible-gama09/CRQSAM2.jcl"
+        location: USS
+        wait_time_s: 30
+      register: crqsam2_result
+
+    - name: Display CRQSAM2 job result
+      debug:
+        msg: |
+          Job Name: {{ crqsam2_result.jobs[0].job_name | default('N/A') }}
+          Job ID: {{ crqsam2_result.jobs[0].job_id | default('N/A') }}
+          Return Code: {{ crqsam2_result.jobs[0].ret_code | default('N/A') }}
+          Status: {{ 'SUCCESS' if crqsam2_result.jobs[0].ret_code.msg == 'CC 0000' else 'CHECK OUTPUT' }}
+
+    - name: Pause to ensure datasets are cataloged
+      pause:
+        seconds: 2
+
+    # ========================================
+    # STEP 2: Copy QSAM dataset
+    # ========================================
+
+    - name: Copy one QSAM dataset to another QSAM
+      ibm.ibm_zos_core.zos_copy:
+        src: "{{ source_dataset }}"
+        dest: "{{ target_dataset }}"
+        remote_src: true
+        force: true
+      register: copy_result
+
+    - name: Display copy result
+      debug:
+        msg: |
+          Copy Operation: {{ 'SUCCESS' if copy_result.changed else 'FAILED' }}
+          Source: {{ source_dataset }}
+          Destination: {{ target_dataset }}
+          Changed: {{ copy_result.changed }}
+
+    # ========================================
+    # STEP 3: Fetch dataset contents
+    # ========================================
+
+    - name: Fetch dataset from z/OS to local
+      ibm.ibm_zos_core.zos_fetch:
+        src: "{{ target_dataset }}"
+        dest: "/tmp/QSAM2_downloaded"
+        flat: true
+      register: fetch_result
+
+    - name: Display fetch result
+      debug:
+        msg: |
+          Fetch Operation: {{ 'SUCCESS' if fetch_result.changed else 'FAILED' }}
+          Dataset: {{ target_dataset }}
+          Local File: {{ fetch_result.file | default('/tmp/QSAM2_downloaded') }}
+
+    # ========================================
+    # STEP 4: Display dataset contents
+    # ========================================
+
+    - name: Display dataset contents
+      debug:
+        msg: "{{ lookup('file', '/tmp/QSAM2_downloaded') }}"
+
+    # ========================================
+    # SUMMARY
+    # ========================================
+
+    - name: Lab Summary
+      debug:
+        msg: |
+          ============================================
+          LAB COMPLETION SUMMARY
+          ============================================
+          1. CRQSAM1 Job: {{ crqsam1_result.jobs[0].ret_code.msg | default('N/A') }}
+          2. CRQSAM2 Job: {{ crqsam2_result.jobs[0].ret_code.msg | default('N/A') }}
+          3. Dataset Copy: {{ 'SUCCESS' if copy_result.changed else 'FAILED' }}
+          4. Dataset Fetch: {{ 'SUCCESS' if fetch_result.changed else 'FAILED' }}
+          ============================================
+          Source Dataset: {{ source_dataset }}
+          Target Dataset: {{ target_dataset }}
+          ============================================

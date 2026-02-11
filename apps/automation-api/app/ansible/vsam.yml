@@ -1,0 +1,131 @@
+---
+- name: Define VSAM KSDS using IDCAMS
+  hosts: zos_host
+  gather_facts: false
+  environment: "{{ environment_vars }}"
+  vars:
+    cluster_name: "{{ ansible_user }}.ANSIBLE.KSDS"
+
+  tasks:
+    - name: Delete existing VSAM cluster (cleanup)
+      ibm.ibm_zos_core.zos_mvs_raw:
+        program_name: IDCAMS
+        auth: true
+        dds:
+          - dd_input:
+              dd_name: SYSIN
+              content: |
+                * protect leading character
+                DELETE {{ cluster_name }} CLUSTER PURGE
+                  SET MAXCC=0
+          - dd_output:
+              dd_name: SYSPRINT
+              return_content:
+                type: text
+      register: delete_result
+      ignore_errors: true
+
+    - name: Display delete result (if available)
+      ansible.builtin.debug:
+        var: delete_result
+      when: delete_result is defined
+
+    - name: Define VSAM KSDS cluster using IDCAMS
+      ibm.ibm_zos_core.zos_mvs_raw:
+        program_name: IDCAMS
+        auth: true
+        verbose: true                # <-- helpful for debugging; remove once confirmed working
+        dds:
+          - dd_input:
+              dd_name: SYSIN
+              content: |
+                * protect leading character
+                DEFINE CLUSTER (NAME({{ cluster_name }}) -
+                  INDEXED -
+                  RECORDSIZE(80 80) -
+                  KEYS(10 0) -
+                  CYLINDERS(10 5) -
+                  FREESPACE(10 10) -
+                  SHAREOPTIONS(2 3) -
+                  REUSE) -
+                  DATA (NAME({{ cluster_name }}.DATA)) -
+                  INDEX (NAME({{ cluster_name }}.INDEX))
+          - dd_output:
+              dd_name: SYSPRINT
+              return_content:
+                type: text
+      register: define_result
+
+    - name: Display DEFINE result
+      ansible.builtin.debug:
+        var: define_result
+
+    - name: Display DEFINE output content
+      ansible.builtin.debug:
+        msg: "{{ define_result.dd_names | selectattr('dd_name', 'equalto', 'SYSPRINT') | map(attribute='content') | list }}"
+      when: define_result.dd_names is defined
+
+    - name: Save DEFINE output to file
+      ansible.builtin.copy:
+        content: "{{ define_result.dd_names | selectattr('dd_name', 'equalto', 'SYSPRINT') | map(attribute='content') | join('\n') }}"
+        dest: "./define_output.txt"
+      delegate_to: localhost
+      when: define_result.dd_names is defined
+
+    - name: Check if DEFINE was successful
+      ansible.builtin.assert:
+        that:
+          - define_result.ret_code.code == 0
+        fail_msg: "VSAM cluster definition failed with return code {{ define_result.ret_code.code }}"
+        success_msg: "VSAM cluster defined successfully"
+
+    - name: Query catalog with LISTCAT
+      ibm.ibm_zos_core.zos_mvs_raw:
+        program_name: IDCAMS
+        auth: true
+        verbose: true                # <-- helpful for debugging; remove once confirmed working
+        dds:
+          - dd_input:
+              dd_name: SYSIN
+              content: |
+                * protect leading character
+                LISTCAT ENTRIES('{{ cluster_name }}') ALL
+          - dd_output:
+              dd_name: SYSPRINT
+              return_content:
+                type: text
+      register: listcat_result
+
+    - name: Display LISTCAT result
+      ansible.builtin.debug:
+        var: listcat_result
+
+    - name: Display LISTCAT output content
+      ansible.builtin.debug:
+        msg: "{{ listcat_result.dd_names | selectattr('dd_name', 'equalto', 'SYSPRINT') | map(attribute='content') | list }}"
+      when: listcat_result.dd_names is defined
+
+    - name: Save LISTCAT output to file
+      ansible.builtin.copy:
+        content: "{{ listcat_result.dd_names | selectattr('dd_name', 'equalto', 'SYSPRINT') | map(attribute='content') | join('\n') }}"
+        dest: "./listcat_output.txt"
+      delegate_to: localhost
+      when: listcat_result.dd_names is defined
+
+    - name: Final summary
+      ansible.builtin.debug:
+        msg:
+          - "========================================="
+          - "VSAM KSDS Definition Complete"
+          - "========================================="
+          - "Cluster: {{ cluster_name }}"
+          - "Type: INDEXED (KSDS)"
+          - "Record Size: 80 bytes (fixed)"
+          - "Key: 10 bytes at offset 0"
+          - "Space: 10 CYL primary, 5 CYL secondary"
+          - "Return Code: {{ define_result.ret_code.code }}"
+          - ""
+          - "Output files created:"
+          - " - define_output.txt"
+          - " - listcat_output.txt"
+          - "========================================="
