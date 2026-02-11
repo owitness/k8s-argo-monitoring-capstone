@@ -26,6 +26,14 @@ s3_client = boto3.client('s3')
 async def health():
     return {"status": "ok"}
 
+def _s3_key(prefix: str, *parts: str) -> str:
+    """Build S3 key with proper slash handling between prefix and parts."""
+    path = "/".join(parts)
+    if not prefix:
+        return path.lstrip("/")
+    prefix = prefix.rstrip("/")
+    return f"{prefix}/{path}".lstrip("/")
+
 def download_from_s3(bucket: str, s3_path: str, local_path: str) -> bool:
     """Download a file from S3 to local filesystem"""
     try:
@@ -108,12 +116,12 @@ async def run_jcl(
             logger.info(f"[{job_id}] Created temporary directory: {tmpdir}")
 
             # Download playbook
-            playbook_s3_path = f"{s3_prefix}ansible/{playbook_name}".lstrip("/")
+            playbook_s3_path = _s3_key(s3_prefix, "ansible", playbook_name)
             playbook_local = os.path.join(tmpdir, os.path.basename(playbook_name))
             download_from_s3(S3_BUCKET, playbook_s3_path, playbook_local)
 
             # Download the JCL file from S3
-            jcl_s3_path = f"{s3_prefix}jcl/{jcl_file}".lstrip("/")
+            jcl_s3_path = _s3_key(s3_prefix, "jcl", jcl_file)
             jcl_local = os.path.join(tmpdir, jcl_file)
             download_from_s3(S3_BUCKET, jcl_s3_path, jcl_local)
             logger.info(f"[{job_id}] Downloaded JCL to {jcl_local}")
