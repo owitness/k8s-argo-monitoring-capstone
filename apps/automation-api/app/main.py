@@ -2,11 +2,15 @@ import logging
 import os
 from fastapi import FastAPI, HTTPException
 import ansible_runner
+from prometheus_fastapi_instrumentator import Instrumentator
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = FastAPI()
+
+# Prometheus metrics
+Instrumentator().instrument(app).expose(app, endpoint="/metrics")
 
 # Resolve ansible dir relative to this file so it works locally and in Docker
 ANSIBLE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ansible")
