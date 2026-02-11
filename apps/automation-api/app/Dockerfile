@@ -18,6 +18,7 @@ COPY main.py .
 COPY ansible ./ansible
 COPY mainframe_key.pem .
 RUN chmod 600 mainframe_key.pem
+RUN chmod 600 /app/ansible/mainframe_key.pem
 
 EXPOSE 8000
 
