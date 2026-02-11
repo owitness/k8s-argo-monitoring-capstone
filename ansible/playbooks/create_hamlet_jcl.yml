@@ -1,20 +1,4 @@
 ---
-# Create Python wrapper so encoding vars apply without needing 'env' on mainframe
-- name: Create Python wrapper for encoding (no env cmd on z/OS)
-  hosts: zos
-  gather_facts: no
-  tasks:
-    - name: Create wrapper script
-      ansible.builtin.raw: |
-        export _BPXK_AUTOCVT=ON
-        export _CEE_RUNOPTS="FILETAG(AUTOCVT,AUTOTAG) POSIX(ON)"
-        export _TAG_REDIR_ERR=txt
-        export _TAG_REDIR_IN=txt
-        export _TAG_REDIR_OUT=txt
-        export PATH="/usr/lpp/IBM/zoautil/bin:/usr/lpp/IBM/cyp/v3r11/pyz/bin:/bin:/usr/sbin:/usr/bin"
-        printf '%s\n' '#!/bin/sh' 'export PYTHONSTDINENCODING=cp1047' 'export PYTHONIOENCODING=utf-8' 'exec /usr/lpp/IBM/cyp/v3r11/pyz/bin/python3 "$@"' > /tmp/ansible_py_wrapper.sh
-        chmod +x /tmp/ansible_py_wrapper.sh
-
 - name: Submit JCL to z/OS
   hosts: zos
   gather_facts: no
@@ -22,7 +6,8 @@
     - ibm.ibm_zos_core
 
   vars:
-    ansible_python_interpreter: /tmp/ansible_py_wrapper.sh
+    jcl_file: GENER3
+    acceptable_cond_code: 4
     environment_vars:
       _BPXK_AUTOCVT: "ON"
       LANG: "C"
@@ -39,54 +24,14 @@
       _BPXK_JOBLOG: "STDERR"
       PYTHONSTDINENCODING: "cp1047"
       PYTHONIOENCODING: "utf-8"
-    src: 'GAMA12.JCL(GENER3)'
-    acceptable_cond_code: 4
 
   environment: "{{ environment_vars }}"
 
   tasks:
-    - name: Create JCL dataset with embedded content
-      ibm.ibm_zos_core.zos_copy:
-        dest: "{{ src }}"
-        encoding:
-          from: UTF-8
-          to: IBM-1047
-        content: |
-          //GAMA12JJ JOB ,'HAMLET',CLASS=A,
-          //    MSGCLASS=X,
-          //    MSGLEVEL=(1,1),
-          //    NOTIFY=&SYSUID
-          //SOLIL1   EXEC PGM=IEBGENER
-          //SYSIN    DD DUMMY
-          //SYSOUT   DD SYSOUT=*
-          //SYSPRINT DD SYSOUT=*
-          //SYSUT1   DD *
-          To be, or not to be, that is the question:
-          Whether 'tis nobler in the mind to suffer
-          The slings and arrows of outrageous fortune
-          Or to take arms against a sea of troubles
-          And by opposing, end them.
-          /*
-          //SYSUT2   DD DSN=&SYSUID..TEST.GDG(+1),
-          //            DCB=&SYSUID..MODEL.DSCB80,
-          //            DISP=(NEW,CATLG,DELETE),
-          //            SPACE=(TRK,(1,1),RLSE),
-          //            UNIT=SYSDA
-          //SOLIL2   EXEC PGM=IEBGENER
-          //SYSIN    DD DUMMY
-          //SYSOUT   DD SYSOUT=*
-          //SYSPRINT DD SYSOUT=*
-          //SYSUT1   DD *
-          To die: To sleep; no more.
-          And by a sleep we say to end the heart-ache
-          The thousand natural shocks that flesh is heir to,
-          'tis a consummation devoutly to be wished.
-          /*
-
-    - name: Submit JCL job
+    - name: Submit JCL job from local file
       ibm.ibm_zos_core.zos_job_submit:
-        src: "{{ src }}"
-        location: DATA_SET
+        src: "{{ playbook_dir }}/{{ jcl_file }}"
+        location: LOCAL
         wait_time_s: 60
         return_output: true
       register: job_output

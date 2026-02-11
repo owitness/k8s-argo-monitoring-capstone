@@ -48,7 +48,8 @@ def download_from_s3(bucket: str, s3_path: str, local_path: str) -> bool:
 async def execute_ansible_playbook(
     playbook_path: str,
     inventory_path: str,
-    tmpdir: str
+    tmpdir: str,
+    jcl_file: str = "GENER3",
 ) -> dict:
     """
     Execute Ansible playbook in tmpdir with cwd set to tmpdir
@@ -68,8 +69,8 @@ host_key_checking = False
 pipelining = True
 """)
         # Run the ansible-playbook command with cwd=tmpdir
-        # Build extra vars if needed
-        extra_vars = "ansible_remote_tmp=/tmp/ansible-gama12 ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
+        # Build extra vars: pass jcl_file so playbook can use {{ playbook_dir }}/{{ jcl_file }}
+        extra_vars = f"ansible_remote_tmp=/tmp/ansible-gama12 ansible_ssh_common_args='-o StrictHostKeyChecking=no' jcl_file={jcl_file}"
         command = [
             "ansible-playbook",
             "-i", inventory_path,
@@ -169,7 +170,8 @@ async def run_jcl(
             execution_result = await execute_ansible_playbook(
                 playbook_local,
                 inventory_path,
-                tmpdir
+                tmpdir,
+                jcl_file=jcl_file,
             )
 
             # Return the result
