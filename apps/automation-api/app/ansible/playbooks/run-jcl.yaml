@@ -1,0 +1,12 @@
+---
+- name: Run dummy JCL on z/OS
+  hosts: zos
+  gather_facts: no
+  tasks:
+    - name: Print message (placeholder)
+      ansible.builtin.debug:
+        msg: "Would submit JCL: {{ jcl_file | default('hello.jcl') }}"
+
+    - name: Simulate success
+      ansible.builtin.debug:
+        msg: "JCL completed with RC=0 (simulated)"
