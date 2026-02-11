@@ -1,0 +1,24 @@
+---
+- name: Upload CRQSAM1 JCL to z/OS PDS member
+  hosts: zos_host
+  gather_facts: false
+  tasks:
+    - name: Ensure GAMA09.JCL PDS exists (create if missing)
+      ibm.ibm_zos_core.zos_data_set:
+        name: GAMA09.JCL
+        type: PDS
+        state: present
+        format:
+          record_format: FB
+          record_length: 80
+          block_size: 3120   # standard for JCL
+
+    - name: Copy local CRQSAM1 to PDS member
+      ibm.ibm_zos_core.zos_copy:
+        src: jcl/CRQSAM1   # relative path from your ansible dir
+        dest: GAMA09.JCL(CRQSAM1)
+        remote_src: no
+        encoding:
+          from: ISO-8859-1   # or UTF-8 if your local file is ASCII
+          to: IBM-1047       # EBCDIC for z/OS JCL compatibility
+        force: true

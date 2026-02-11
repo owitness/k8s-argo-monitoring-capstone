@@ -1,0 +1,27 @@
+---
+# This example demonstrates how to collect information about
+# a z/OS node for specified subsets of information, and how 
+# to specify a filter to limit the information returned to
+# values of interest. 
+# This example is limited to specifications that are supported
+# in older versions of ansible and the ibm_zos_core collection.
+- name: Gather facts from z/OS node 
+  hosts: zos
+  gather_facts: false 
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+
+  tasks:
+    - name: Gather master catalog info from 'ipl' subset 
+      zos_gather_facts:
+        gather_subset:
+          - 'ipl'
+          - 'cpu'
+          - 'iodf'
+        filter:
+          - 'master*'
+           
+    - name: Print out all collected info 
+      debug:
+        var: ansible_facts        

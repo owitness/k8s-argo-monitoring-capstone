@@ -1,0 +1,22 @@
+---
+- name: Run job and copy contents of a selected output dataset to a local file
+  hosts: zos
+  gather_facts: no
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+   
+  tasks:
+    - include_tasks: tasks/submit_jcl.yml 
+      vars:
+        src: IBMUSER.JCL(IN2OUT)
+        acceptable_cond_code: 4
+         
+    - name: Set facts used in this playbook 
+      set_fact:
+        ddname_to_copy: SYSUT2
+ 
+    - name: Display lines from dataset SYSUT2
+      include_tasks: tasks/display_dataset_content.yml
+      vars:
+        dataset_to_display: "{{ (job_output.jobs[0].ddnames | selectattr('ddname','equalto',ddname_to_display) | list | first) }}"

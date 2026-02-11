@@ -1,0 +1,98 @@
+---
+- name: Lab 25 - Concatenate two GDG generations
+  hosts: zos_host
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+  vars:
+    gdg_base: GAMA09.TEST.GDG
+    model_dscb: GAMA09.MODEL.DSCB80
+    concat_ds: GAMA09.TEST.CONCAT
+    fetch_dest: /tmp/gdg_concat.txt
+    
+  tasks:
+    - name: Force delete and define GDG base
+      zos_mvs_raw:
+        program_name: IDCAMS
+        auth: true
+        dds:
+          - dd_input:
+              dd_name: SYSIN
+              content: " DELETE {{ gdg_base }} GDG FORCE\n SET MAXCC = 0\n DEFINE GDG (NAME({{ gdg_base }}) LIMIT(50) NOEMPTY SCRATCH)\n"
+          - dd_output:
+              dd_name: SYSPRINT
+              return_content:
+                type: text
+      register: define_gdg
+
+    - name: Show GDG define output (check for IDC messages)
+      debug:
+        msg: "{{ define_gdg.dd_names[0].content }}"
+
+    - name: Define model DSCB if needed
+      zos_mvs_raw:
+        program_name: IDCAMS
+        auth: true
+        dds:
+          - dd_input:
+              dd_name: SYSIN
+              content: " SET MAXCC = 0\n DEFINE NONVSAM (NAME({{ model_dscb }}) RECFM(FB) LRECL(80) BLKSIZE(27920))\n IF LASTCC = 8 THEN SET MAXCC = 0\n"
+          - dd_output:
+              dd_name: SYSPRINT
+              return_content:
+                type: text
+      register: model_result
+
+    - name: Show model DSCB result
+      debug:
+        msg: "{{ model_result.dd_names[0].content }}"
+
+    - name: Create generation 1 using GENER2
+      zos_job_submit:
+        src: "/home/owit/ansible-zos/jcl/GENER2"
+        location: LOCAL
+        wait_time_s: 60
+        return_output: true
+      register: gen_job1
+      ignore_errors: true
+
+    - name: Create generation 2 using GENER2 again
+      zos_job_submit:
+        src: "/home/owit/ansible-zos/jcl/GENER2"
+        location: LOCAL
+        wait_time_s: 60
+        return_output: true
+      register: gen_job2
+      ignore_errors: true
+
+    - name: Delete old concat ds
+      zos_data_set:
+        name: "{{ concat_ds }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Submit concatenation job
+      zos_job_submit:
+        src: "/home/owit/ansible-zos/jcl/CONCAT.jcl"
+        location: LOCAL
+        wait_time_s: 60
+        return_output: true
+      register: concat_job
+
+    - name: Show concat job output (debug why it fails)
+      debug:
+        var: concat_job
+      when: concat_job.jobs[0].ret_code.code is not defined or concat_job.jobs[0].ret_code.code != 0
+
+    - name: Fetch concatenated dataset (only if job succeeded)
+      zos_fetch:
+        src: "{{ concat_ds }}"
+        dest: "{{ fetch_dest }}"
+        flat: true
+      when: concat_job.jobs[0].ret_code.code is defined and concat_job.jobs[0].ret_code.code == 0
+
+    - name: Show content
+      debug:
+        msg: "{{ lookup('file', fetch_dest).split('\n') }}"
+      when: concat_job.jobs[0].ret_code.code is defined and concat_job.jobs[0].ret_code.code == 0

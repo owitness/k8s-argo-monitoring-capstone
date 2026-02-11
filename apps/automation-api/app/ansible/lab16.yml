@@ -1,0 +1,35 @@
+---
+- name: Lab 16 - Conditionally Delete and Create Variable-Blocked QSAM Data Set
+  hosts: zos_host
+  collections:
+    - ibm.ibm_zos_core
+  gather_facts: false
+  environment:  # ← Add this block here
+    _BPXK_AUTOCVT: "ON"
+    LANG: "C"
+    _TAG_REDIR_ERR: "txt"
+    _TAG_REDIR_IN: "txt"
+    _TAG_REDIR_OUT: "txt"
+    _CEE_RUNOPTS: "FILETAG(AUTOCVT,AUTOTAG) POSIX(ON)"
+    ZOAU_ROOT: "/usr/lpp/IBM/zoautil"
+    ZOAU_HOME: "/usr/lpp/IBM/zoautil"
+    PATH: "/usr/lpp/IBM/zoautil/bin:/usr/lpp/IBM/cyp/v3r9/pyz/bin:/bin:/var/bin:$PATH"
+    PYTHONPATH: "/usr/lpp/IBM/zoautil/lib"
+    LIBPATH: "/usr/lpp/IBM/zoautil/lib:/usr/lpp/IBM/cyp/v3r9/pyz/lib:/lib:/usr/lib:."
+  tasks:
+    - name: Conditionally delete and create the VB QSAM data set
+      zos_data_set:
+        name: GAMA09.LAB16.VB.QSAM
+        state: present
+        type: seq
+        replace: true
+        record_format: vb
+        record_length: 104
+        block_size: 4160
+        space_primary: 1
+        space_secondary: 1
+        space_type: cyl
+      register: ds_result
+    - name: Display creation result
+      debug:
+        var: ds_result

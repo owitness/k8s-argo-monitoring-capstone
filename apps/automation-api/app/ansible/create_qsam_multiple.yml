@@ -1,0 +1,37 @@
+---
+# This playbook creates multiple QSAM data sets (sequential files)
+# on the z/OS instance.
+
+- name: Conditionally delete and create sequential data sets
+  hosts: zos
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+
+  tasks:
+    - name: Set facts used in this playbook
+      set_fact:
+        zos_username: IBMUSER
+
+    - name: Create sequential data sets
+      zos_data_set:
+        name: "{{ item }}"      # CREATE: DD DSN=(...)
+        type: seq                        # CREATE: DD DCB=(DSORG=PS)
+        format: fb                       # CREATE: DD DCB=(RECFM=FB)
+        record_length: 80                # CREATE: DD DCB=(LRECL=80)
+        block_size: 8000                 # CREATE: DD DCB=(BLKSIZE=32000)
+        state: present                   # CREATE: DD DISP=(MOD,...)
+        replace: true                    # CREATE: DD DISP(...,CATLG,...)
+        space_type: trk                  # CREATE: DD SPACE=(TRK,...)
+        space_primary: 1                 # CREATE: DD SPACE=(...,(1,...))
+        space_secondary: 1               # CREATE: DD SPACE=(...,(...,1))
+      loop:
+        - "{{ zos_username }}.QSAM1"
+        - "{{ zos_username }}.QSAM2"
+        - "{{ zos_username }}.QSAM3"
+      register: result
+
+    - name: Display result of data set creation
+      debug:
+        msg: "{{ result }}"      

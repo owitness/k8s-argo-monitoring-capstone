@@ -1,0 +1,39 @@
+---
+- name: List active started tasks
+  hosts: zos
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+
+    # Standard way
+    # If job_class is not supported for zos_job_query in your version
+    # of ibm_zos_core, try the workaround below
+
+  tasks:
+    #    - name: List started tasks
+    #      zos_job_query:
+    #        job_class: STC
+    #      register: result
+
+    #    - name: Display result
+    #        var: "{{ result.jobs }}"
+    # Workaround for older versions of ibm_zos_core
+
+    - name: Query all active jobs
+      zos_job_query:
+      register: active_jobs
+
+    - name: Keep only started tasks
+      set_fact:
+        started_tasks: >-
+          {{
+            active_jobs.jobs
+            | selectattr('job_class', 'defined')
+            | selectattr('job_class', 'equalto', 'STC')
+            | list
+          }}
+
+    - name: Display result
+      debug:
+        var: started_tasks    

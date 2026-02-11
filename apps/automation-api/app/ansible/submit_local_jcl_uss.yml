@@ -1,0 +1,27 @@
+---
+- name: Submit JCL stored locally
+  hosts: zos
+  gather_facts: no
+  collections:
+    - ibm.ibm_zos_core
+  environment: {{ environment_vars }}
+
+  tasks:
+    - name: Copy local file to a USS location 
+      zos_copy:
+        src: ./jcl/CRQSAM
+        dest: /u/ibmuser/crqsam.jcl
+        remote_src: false 
+        force: true
+
+    - name: Submit JCL from USS location 
+      zos_job_submit:
+        src: /u/ibmuser/crqsam.jcl
+        location: USS
+        wait_time_s: 60
+        return_output: true 
+      register: job_output   
+
+    - name: Display all results 
+      debug:
+        var: job_output            

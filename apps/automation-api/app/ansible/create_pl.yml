@@ -1,0 +1,57 @@
+---
+# Lab 20: Use Ansible to create a program object library
+- name: Create Program Object Library
+  hosts: zos_host
+  gather_facts: false
+
+  vars:
+    program_library: "{{ ansible_user | upper }}.MYPROGS.LOADLIB"
+
+  # Apply environment variables to all tasks in this play
+  environment: "{{ zos_environment }}"
+
+  tasks:
+    - name: Display the program library name to be created
+      ansible.builtin.debug:
+        msg: "Creating program library: {{ program_library }}"
+
+    - name: Conditionally delete existing program library
+      ibm.ibm_zos_core.zos_data_set:
+        name: "{{ program_library }}"
+        state: absent
+      register: delete_result
+      ignore_errors: true
+
+    - name: Display deletion result
+      ansible.builtin.debug:
+        msg: "{{ 'Program library deleted' if delete_result.changed else 'Program library did not exist' }}"
+
+    - name: Create program library (PDSE)
+      ibm.ibm_zos_core.zos_data_set:
+        name: "{{ program_library }}"
+        type: pdse
+        state: present
+        format: u
+        space_primary: 5
+        space_secondary: 1
+        space_type: cyl
+        record_length: 0
+        block_size: 32760
+        directory_blocks: 20
+        replace: false
+      register: create_result
+
+    - name: Display creation result
+      ansible.builtin.debug:
+        msg: "Program library created successfully: {{ program_library }}"
+      when: create_result.changed
+
+    - name: Verify program library attributes
+      ibm.ibm_zos_core.zos_data_set:
+        name: "{{ program_library }}"
+        state: present
+      register: verify_result
+
+    - name: Display program library information
+      ansible.builtin.debug:
+        var: verify_result

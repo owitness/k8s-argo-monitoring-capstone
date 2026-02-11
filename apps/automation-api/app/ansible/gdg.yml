@@ -1,0 +1,47 @@
+---
+# Lab 22: Use Ansible to define a GDG
+# This playbook creates a Generation Data Group (GDG) using IDCAMS via zos_mvs_raw
+
+- name: Define a Generation Data Group (GDG)
+  hosts: zos_host
+  gather_facts: false
+  environment: "{{ zos_environment }}"
+
+  vars:
+    gdg_name: "GAMA09.MY.GDG"
+    gdg_limit: 5
+
+  tasks:
+    - name: Define GDG using IDCAMS (idempotent)
+      ibm.ibm_zos_core.zos_mvs_raw:
+        program_name: idcams
+        auth: false
+        dds:
+          - dd_name: sysprint
+            dd_output:
+              dd_name: sysprint
+          - dd_name: sysin
+            dd_input:
+              content: |
+                DELETE {{ gdg_name }} GDG
+                IF LASTCC = 8 THEN SET MAXCC = 0
+                DEFINE GDG(NAME({{ gdg_name }}) -
+                  LIMIT({{ gdg_limit }}) -
+                  NOEMPTY -
+                  NOSCRATCH)
+      register: idcams_result
+
+    - name: Display IDCAMS output
+      debug:
+        var: idcams_result.dd_names
+
+    - name: Check if GDG was created successfully
+      debug:
+        msg: |
+          GDG {{ gdg_name }} operation completed.
+          Return Code: {{ idcams_result.ret_code.code }}
+          {% if idcams_result.ret_code.code == 0 %}
+          Status: Success - GDG is ready for use
+          {% else %}
+          Status: Check SYSPRINT output above for details
+          {% endif %}

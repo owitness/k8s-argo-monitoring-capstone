@@ -1,0 +1,32 @@
+---
+- name: Verify GDG exists
+  hosts: zos_host
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+  
+  tasks:
+    - name: List GDG catalog entry
+      zos_mvs_raw:
+        program_name: IDCAMS
+        auth: true
+        dds:
+          - dd_input:
+              dd_name: SYSIN
+              content: |-
+                 LISTCAT ENTRIES(GAMA09.TEST.GDG) ALL
+          - dd_output:
+              dd_name: SYSPRINT
+              return_content:
+                type: text
+      register: listcat_result
+
+    - name: Show full result structure
+      debug:
+        var: listcat_result
+
+    - name: Show LISTCAT output (corrected path)
+      debug:
+        var: listcat_result.dd_names
+      when: listcat_result.dd_names is defined

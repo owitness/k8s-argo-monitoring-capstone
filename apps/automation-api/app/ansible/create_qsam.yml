@@ -1,0 +1,50 @@
+---
+# This playbook creates a QSAM data set (sequential file)
+# on the z/OS instance.
+# Task "Delete data set if it exists" deletes and uncatalogues
+# the data set if it exists, and otherwise does nothing.
+# Task "Create sequential data set" creates the data set.
+# This is a common action on z/OS systems when we need to reset
+# a sequential data set to "empty".
+
+- name: Conditionally delete and then create a sequential data set
+  hosts: zos
+  gather_facts: false
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+
+  tasks:
+    - name: Set facts used in this playbook
+      set_fact:
+        data_set_name: GAMA09.QSAM1
+
+    - name: Delete data set if it exists
+      zos_data_set:
+        name: "{{ data_set_name }}"      # DELETE: DSN=(...)
+        type: seq                        # Matches catalog entry
+        state: absent                    # DELETE: DD DISP=(...,DELETE,DELETE)
+        force: true
+      register: result
+
+    - name: Display result of data set deletion
+      debug:
+        msg: "{{ result }}"
+
+    - name: Create sequential data set
+      zos_data_set:
+        name: "{{ data_set_name }}"      # CREATE: DD DSN=(...)
+        type: seq                        # CREATE: DD DCB=(DSORG=PS)
+        format: fb                       # CREATE: DD DCB=(RECFM=FB)
+        record_length: 300                # CREATE: DD DCB=(LRECL=80)
+        block_size: 6000                 # CREATE: DD DCB=(BLKSIZE=32000)
+        state: present                   # CREATE: DD DISP=(MOD,...)
+        replace: true                    # CREATE: DD DISP(...,CATLG,...)
+        space_type: trk                  # CREATE: DD SPACE=(TRK,...)
+        space_primary: 1                 # CREATE: DD SPACE=(...,(1,...))
+        space_secondary: 1               # CREATE: DD SPACE=(...,(...,1))
+      register: result
+
+    - name: Display result of data set creation
+      debug:
+        msg: "{{ result }}"

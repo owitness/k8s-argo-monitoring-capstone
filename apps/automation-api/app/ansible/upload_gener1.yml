@@ -1,0 +1,49 @@
+---
+- name: Upload GENER1 JCL to z/OS using dcp -B (binary)
+  hosts: zos_host
+  gather_facts: no
+  environment:
+    _BPXK_AUTOCVT: ON
+    ZOAU_HOME: /usr/lpp/IBM/zoautil
+    LIBPATH: /usr/lpp/IBM/zoautil/lib:/usr/lpp/IBM/cyp/v3r11/pyz/lib:/lib:/usr/lib
+    PATH: /usr/lpp/IBM/zoautil/bin:/usr/lpp/IBM/cyp/v3r11/pyz/bin:/bin:/usr/bin
+  tasks:
+    - name: Ensure temp directory exists in USS
+      ansible.builtin.file:
+        path: /tmp/ansible-jcl
+        state: directory
+        mode: '0755'
+
+    - name: Copy local JCL to USS temp file and force Unix line endings
+      ansible.builtin.copy:
+        src: ../jcl/GENER1
+        dest: /tmp/ansible-jcl/GENER1.txt
+        mode: '0644'
+
+    - name: Remove CR characters and ensure LF line endings
+      ansible.builtin.shell: |
+        sed -i 's/\r$//' /tmp/ansible-jcl/GENER1.txt
+        # Optional: ensure no trailing spaces
+        sed -i 's/[ \t]*$//' /tmp/ansible-jcl/GENER1.txt
+      args:
+        executable: /bin/sh
+    - name: Copy to PDS member using binary mode (no conversion)
+      ansible.builtin.shell: |
+        dcp -B /tmp/ansible-jcl/GENER1.txt "GAMA09.JCL(GENER1)"
+      args:
+        executable: /bin/sh
+
+    - name: Verify member content from USS
+      ansible.builtin.command: head -n 20 "//'GAMA09.JCL(GENER1)'"
+      register: verify_head
+      changed_when: false
+      ignore_errors: true
+
+    - name: Display verification (should show clean JCL with full lines)
+      debug:
+        msg: "{{ verify_head.stdout_lines | default(['No output']) }}"
+
+    - name: Clean up temp file
+      ansible.builtin.file:
+        path: /tmp/ansible-jcl/GENER1.txt
+        state: absent

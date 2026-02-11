@@ -1,0 +1,45 @@
+---
+# This example demonstrates gathering the zinfo subset, which
+# provides a lot of useful information about the z/OS node.
+# This is supported in recent versions of ansible and of the
+# ibm_zos_core collection. It may not work in the training
+# environment, which doesn't have the current version of
+# ZOAU installed on the z/OS side.
+# In that case you will see error: 
+# "BGYSC5203E Invalid option argument: zinfo". 
+# 
+# This example also shows how to print out selected data
+# values rather than dumping the whole collection of facts.
+
+- name: Gather facts from z/OS node 
+  hosts: zos
+  gather_facts: false 
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+
+  tasks:
+    - name: Gather various z/OS facts
+      zos_gather_facts:
+        gather_subset:
+          - 'zinfo'
+          - 'cpu'
+          - 'iodf'
+
+    - name: Gather master catalog facts only
+      zos_gather_facts:
+        gather_subset:
+          - 'sys'        
+        filter:
+          - 'master*'
+
+    - name: Print out selected facts 
+      debug:
+        msg:
+          - "Master Catalog DSN: {{ ansible_facts.master_catalog_dsn }}"
+          - "Master Catalog VOLSER: {{ ansible_facts.master_catalog_volser }}"
+          - "IODF Name: {{ iodf_name }}"      
+           
+    - name: Print out all collected info 
+      debug:
+        var: ansible_facts        
