@@ -8,7 +8,7 @@ all:
       ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
       ansible_python_interpreter: /usr/lpp/IBM/cyp/v3r11/pyz/bin/python3
       ansible_pipelining: true
-      ansible_remote_tmp: /tmp/ansible-gama09
+      ansible_remote_tmp: /tmp/ansible-gama12
   vars:
     environment_vars:
       _BPXK_AUTOCVT: "ON"
