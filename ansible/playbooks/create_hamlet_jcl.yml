@@ -1,4 +1,20 @@
 ---
+# Create Python wrapper so encoding vars apply without needing 'env' on mainframe
+- name: Create Python wrapper for encoding (no env cmd on z/OS)
+  hosts: zos
+  gather_facts: no
+  tasks:
+    - name: Create wrapper script
+      ansible.builtin.raw: |
+        export _BPXK_AUTOCVT=ON
+        export _CEE_RUNOPTS="FILETAG(AUTOCVT,AUTOTAG) POSIX(ON)"
+        export _TAG_REDIR_ERR=txt
+        export _TAG_REDIR_IN=txt
+        export _TAG_REDIR_OUT=txt
+        export PATH="/usr/lpp/IBM/zoautil/bin:/usr/lpp/IBM/cyp/v3r11/pyz/bin:/bin:/usr/sbin:/usr/bin"
+        printf '%s\n' '#!/bin/sh' 'export PYTHONSTDINENCODING=cp1047' 'export PYTHONIOENCODING=utf-8' 'exec /usr/lpp/IBM/cyp/v3r11/pyz/bin/python3 "$@"' > /tmp/ansible_py_wrapper.sh
+        chmod +x /tmp/ansible_py_wrapper.sh
+
 - name: Submit JCL to z/OS
   hosts: zos
   gather_facts: no
@@ -6,6 +22,7 @@
     - ibm.ibm_zos_core
 
   vars:
+    ansible_python_interpreter: /tmp/ansible_py_wrapper.sh
     environment_vars:
       _BPXK_AUTOCVT: "ON"
       LANG: "C"
@@ -21,6 +38,7 @@
       STEPLIB: "SYS1.SIEALNKE:CEE.SCEERUN:CEE.SCEERUN2"
       _BPXK_JOBLOG: "STDERR"
       PYTHONSTDINENCODING: "cp1047"
+      PYTHONIOENCODING: "utf-8"
     src: 'GAMA12.JCL(GENER3)'
     acceptable_cond_code: 4
 

@@ -65,7 +65,7 @@ environment = LANG=en_US.UTF-8,LC_ALL=en_US.UTF-8
 host_key_checking = False
 
 [ssh_connection]
-pipelining = False
+pipelining = True
 """)
         # Run the ansible-playbook command with cwd=tmpdir
         # Build extra vars if needed
@@ -145,7 +145,7 @@ async def run_jcl(
                                     'ansible_ssh_private_key_file': local_key_path,
                                     'ansible_ssh_common_args': '-o StrictHostKeyChecking=no',
                                     'ansible_python_interpreter': '/usr/lpp/IBM/cyp/v3r11/pyz/bin/python3',
-                                    'ansible_pipelining': False,
+                                    'ansible_pipelining': True,
                                     'ansible_remote_tmp': '/tmp/ansible-gama12'
                                 }
                             }
