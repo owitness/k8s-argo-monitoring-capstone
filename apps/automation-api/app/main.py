@@ -9,9 +9,7 @@ import stat
 import shutil
 import logging
 import yaml
-from jinja2 import Environment, BaseLoader
 from pathlib import Path
-from typing import Optional, Dict
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,7 +26,6 @@ s3_client = boto3.client('s3')
 async def health():
     return {"status": "ok"}
 
-
 def download_from_s3(bucket: str, s3_path: str, local_path: str) -> bool:
     """Download a file from S3 to local filesystem"""
     try:
@@ -43,13 +40,13 @@ def download_from_s3(bucket: str, s3_path: str, local_path: str) -> bool:
 async def execute_ansible_playbook(
     playbook_path: str,
     inventory_path: str,
-    tmpdir: Optional[str] = None
-) -> Dict:
+    tmpdir: str
+) -> dict:
     """
-    Execute Ansible playbook and capture output
+    Execute Ansible playbook in tmpdir with cwd set to tmpdir
     """
     execution_id = str(uuid.uuid4())[:8]
-    logger.info(f"[{execution_id}] Starting playbook execution")
+    logger.info(f"[{execution_id}] Starting playbook execution in {tmpdir}")
     try:
         # Create ansible.cfg in tmpdir
         ansible_cfg_path = os.path.join(tmpdir, 'ansible.cfg')
@@ -62,31 +59,24 @@ host_key_checking = False
 [ssh_connection]
 pipelining = True
 """)
-        # Change working directory to tmpdir
-        cwd = os.getcwd()
-        os.chdir(tmpdir)
-        try:
-            # Build extra vars string
-            extra_vars = "ansible_remote_tmp=/tmp/ansible_tmp ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
-            # Build command
-            command = [
-                "ansible-playbook",
-                "-i", inventory_path,
-                playbook_path,
-                "-e", extra_vars
-            ]
-            # Run subprocess in tmpdir
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=1800
-            )
-        finally:
-            os.chdir(cwd)
-
+        # Run the ansible-playbook command with cwd=tmpdir
+        # Build extra vars if needed
+        extra_vars = "ansible_remote_tmp=/tmp/ansible_tmp ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
+        command = [
+            "ansible-playbook",
+            "-i", inventory_path,
+            playbook_path,
+            "-e", extra_vars
+        ]
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            timeout=1800,
+            cwd=tmpdir  # Important: set cwd here
+        )
         success = result.returncode == 0
-        logger.info(f"[{execution_id}] Playbook completed with exit code: {result.returncode}")
+        logger.info(f"[{execution_id}] Playbook completed with code {result.returncode}")
         return {
             "execution_id": execution_id,
             "success": success,
@@ -105,7 +95,6 @@ pipelining = True
         raise HTTPException(status_code=500, detail=f"Playbook execution failed: {str(e)}")
 
 
-# JCL Endpoint
 @app.post("/run-jcl")
 async def run_jcl(
     playbook_name: str = "create_hamlet_jcl.yml",
@@ -123,30 +112,26 @@ async def run_jcl(
             playbook_local = os.path.join(tmpdir, os.path.basename(playbook_name))
             download_from_s3(S3_BUCKET, playbook_s3_path, playbook_local)
 
-            # Download inventory
-            #inventory_s3_path = f"{s3_prefix}{inventory_name}".lstrip("/")
-            #inventory_local = os.path.join(tmpdir, inventory_name)
-            #download_from_s3(S3_BUCKET, inventory_s3_path, inventory_local)
-
-            # Download JCL file
+            # Download the JCL file from S3
             jcl_s3_path = f"{s3_prefix}jcl/{jcl_file}".lstrip("/")
             jcl_local = os.path.join(tmpdir, jcl_file)
             download_from_s3(S3_BUCKET, jcl_s3_path, jcl_local)
+            logger.info(f"[{job_id}] Downloaded JCL to {jcl_local}")
 
-            # Download the private key from S3
+            # Download the private key
             key_s3_path = "mainframe_key.pem"  # Adjust as needed
             local_key_path = os.path.join(tmpdir, "mainframe_key.pem")
             download_from_s3(S3_BUCKET, key_s3_path, local_key_path)
-
             os.chmod(local_key_path, stat.S_IRUSR | stat.S_IWUSR)
 
+            # Build inventory
             inventory_dict = {
                 'all': {
                     'children': {
                         'zos': {
                             'hosts': {
                                 'mainframe': {
-                                    'ansible_host': '67.217.62.83',  # your host
+                                    'ansible_host': '67.217.62.83',
                                     'ansible_user': 'GAMA12',
                                     'ansible_python_interpreter': '/usr/lpp/IBM/cyp/v3r11/pyz/bin/python',
                                     'ansible_ssh_private_key_file': local_key_path
@@ -156,20 +141,18 @@ async def run_jcl(
                     }
                 }
             }
-
-            # Save the generated inventory
             inventory_path = os.path.join(tmpdir, 'inventory.yml')
             with open(inventory_path, 'w') as f:
                 yaml.dump(inventory_dict, f)
 
-
+            # Prepare target directory for JCL
             target_dir = os.path.join(os.getcwd(), "../jcl")
             os.makedirs(target_dir, exist_ok=True)
             target_path = os.path.join(target_dir, jcl_file)
             shutil.copy(jcl_local, target_path)
             logger.info(f"[{job_id}] Copied JCL to {target_path}")
 
-            # Run the playbook with the generated inventory
+            # Run ansible playbook with cwd=tmpdir so relative paths work
             logger.info(f"[{job_id}] Executing ansible-playbook")
             execution_result = await execute_ansible_playbook(
                 playbook_local,
@@ -177,12 +160,11 @@ async def run_jcl(
                 tmpdir
             )
 
-            # Return success response
+            # Return the result
             return JSONResponse({
                 "job_id": job_id,
                 "status": "completed",
                 "playbook": playbook_name,
-                #"inventory": inventory_name,
                 "jcl_file": jcl_file,
                 "jcl_local_path": jcl_local,
                 "s3_bucket": S3_BUCKET,
