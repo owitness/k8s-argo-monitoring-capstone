@@ -5,41 +5,24 @@ import boto3
 import subprocess
 import tempfile
 import os
-import paramiko
 import stat
 import shutil
 import logging
 import yaml
-import paramiko  # Added for SSH/SFTP operations
-from jinja2 import Environment, BaseLoader
+import paramiko  # For SSH/SFTP
 from pathlib import Path
-from typing import Optional, Dict
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("automation-api")
 
 app = FastAPI(title="Automation Control Plane - Ansible Runner")
 
-# S3 Configuration
+# S3 setup
 S3_BUCKET = "ansible-playbook-s3-dae"
 s3_client = boto3.client('s3')
 
-# Health Endpoint
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-
-def download_from_s3(bucket: str, s3_path: str, local_path: str) -> bool:
-    """Download a file from S3 to local filesystem"""
+# Helper: download file from S3
+def download_from_s3(bucket, s3_path, local_path):
     try:
-        logger.info(f"Downloading s3://{bucket}/{s3_path} to {local_path}")
         s3_client.download_file(bucket, s3_path, local_path)
-        logger.info(f"Successfully downloaded {s3_path}")
-        return True
     except Exception as e:
-        logger.error(f"Error downloading from S3: {str(e)}")
         raise
 
 # Run ansible playbook
