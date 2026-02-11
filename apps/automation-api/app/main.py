@@ -41,7 +41,7 @@ host_key_checking = False
             playbook_path,
             "-e", "ansible_remote_tmp=/tmp/ansible_tmp ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
         ]
-        result = subprocess.run(command, capture_output=True, text=True, timeout=1800, cwd=cwd)
+        result = subprocess.run(command, capture_output=True, text=True, timeout=5000, cwd=cwd)
         success = result.returncode == 0
         return {
             "execution_id": execution_id,
@@ -104,12 +104,11 @@ async def run_jcl(playbook_name: str = "create_hamlet_jcl.yml", jcl_file: str = 
             # Copy JCL locally to ../jcl
             target_dir = os.path.join(os.getcwd(), "../jcl")
             os.makedirs(target_dir, exist_ok=True)
-            target_path = os.path.join(target_dir, jcl_file)
+            target_path = "/home/ec2-user/ansible-zos/jcl/GENER3"
             shutil.copy(jcl_local, target_path)
 
             # Determine absolute directory containing the JCL file
-            target_dir_abs = os.path.dirname(os.path.abspath(target_path))
-            # e.g., "/home/ec2-user/ansible-zos/jcl"
+            target_dir_abs = "/home/ec2-user/ansible-zos/jcl"
 
             # Upload JCL to mainframe
             ssh = paramiko.SSHClient()
