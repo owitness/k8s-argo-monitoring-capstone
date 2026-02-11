@@ -12,10 +12,13 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Ansible collections during build
-RUN ansible-galaxy collection install ibm.ibm_zos_core community.general ansible.posix --upgrade
+RUN ansible-galaxy collection install ibm.ibm_zos_core==1.9.0 --upgrade
 
 # ────────────── debug ──────────────
 COPY main.py .
+COPY ansible . 
+COPY mainframe_key.pem .
+RUN chmod 600 mainframe_key.pem
 RUN ls -la /app && which ansible-playbook && ansible-galaxy collection list | grep ibm.ibm_zos_core
 # ───────────────────────────────────
 

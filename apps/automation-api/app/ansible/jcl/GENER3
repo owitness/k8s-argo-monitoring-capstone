@@ -1,0 +1,25 @@
+//GAMA12JJ JOB ,'HAMLET',CLASS=A,
+//    MSGCLASS=X,
+//    MSGLEVEL=(1,1),
+//    NOTIFY=&SYSUID
+//SOLIL1   EXEC PGM=IEBGENER
+//SYSIN    DD DUMMY
+//SYSPRINT DD SYSOUT=*
+//SYSUT1   DD *
+To be, or not to be, that is the question:
+Whether 'tis nobler in the mind to suffer
+The slings and arrows of outrageous fortune
+Or to take arms against a sea of troubles
+And by opposing, end them.
+/*
+//SYSUT2   DD SYSOUT=*
+//SOLIL2   EXEC PGM=IEBGENER
+//SYSIN    DD DUMMY
+//SYSPRINT DD SYSOUT=*
+//SYSUT1   DD *
+To die: To sleep; no more.
+And by a sleep we say to end the heart-ache
+The thousand natural shocks that flesh is heir to,
+'tis a consummation devoutly to be wished.
+/*
+//SYSUT2   DD SYSOUT=*

@@ -1,0 +1,8 @@
+//HELLO   JOB (ACCT),'HELLO WORLD',CLASS=A,MSGCLASS=X
+//STEP1    EXEC PGM=IEBGENER
+//SYSPRINT DD SYSOUT=*
+//SYSUT1   DD *
+Hello from Kubernetes-triggered Ansible!
+/*
+//SYSUT2   DD SYSOUT=*
+//SYSIN    DD DUMMY
