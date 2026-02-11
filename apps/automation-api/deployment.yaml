@@ -1,36 +1,3 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: zos-var
-data:
-  # file-like keys
-  var.yml: |
-    PYZ: "/usr/lpp/IBM/cyp/v3r11/pyz"
-    ZOAU: "/usr/lpp/IBM/zoautil"
-    environment_vars:
-      _BPXK_AUTOCVT: "ON"
-      ZOAU_HOME: "{{ ZOAU }}"
-      PYTHONPATH: "{{ ZOAU }}/lib/3.11"
-      LIBPATH: "{{ ZOAU }}/lib:{{ PYZ }}/lib:/lib:/usr/lib:."
-      PATH: "{{ ZOAU }}/bin:{{ PYZ }}/bin:/bin:/var/bin"
-      _CEE_RUNOPTS: "FILETAG(AUTOCVT,AUTOTAG) POSIX(ON)"
-      _TAG_REDIR_ERR: "txt"
-      _TAG_REDIR_IN: "txt"
-      _TAG_REDIR_OUT: "txt"
-      LANG: "C"
-      PYTHONSTDINENCODING: "cp1047"
-  inventory.yml: | 
-    all:
-    children:
-      zos:
-        hosts:
-          mainframe:
-            ansible_host: 67.217.62.83
-        vars:
-          ansible_user: GAMA12
-          ansible_ssh_private_key_file: /home/ec2-user/mainframe_key.pem
-          ansible_python_interpreter: /usr/lpp/IBM/cyp/v3r11/pyz/bin/python    
----
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -49,23 +16,10 @@ spec:
       serviceAccountName: s3-sa 
       containers:
       - name: api
-        volumeMounts:
-        - name: config-vol
-          mountPath: /app/config/var.yml
-          subPath: var.yml
-        - name: config-vol
-          mountPath: /app/config/inventory.yml
-          subPath: inventory.yml
         image: dhricko9/automation-api:1.0.9
         workingDir: /app
         ports:
         - containerPort: 8000
-      volumes:
-      # You set volumes at the Pod level, then mount them into containers inside that Pod
-      - name: config-vol
-        configMap:
-          # Provide the name of the ConfigMap you want to mount.
-          name: zos-var
           
 
 
