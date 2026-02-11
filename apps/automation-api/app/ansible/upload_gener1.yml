@@ -29,12 +29,12 @@
         executable: /bin/sh
     - name: Copy to PDS member using binary mode (no conversion)
       ansible.builtin.shell: |
-        dcp -B /tmp/ansible-jcl/GENER1.txt "GAMA09.JCL(GENER1)"
+        dcp -B /tmp/ansible-jcl/GENER1.txt "GAMA12.JCL(GENER1)"
       args:
         executable: /bin/sh
 
     - name: Verify member content from USS
-      ansible.builtin.command: head -n 20 "//'GAMA09.JCL(GENER1)'"
+      ansible.builtin.command: head -n 20 "//'GAMA12.JCL(GENER1)'"
       register: verify_head
       changed_when: false
       ignore_errors: true

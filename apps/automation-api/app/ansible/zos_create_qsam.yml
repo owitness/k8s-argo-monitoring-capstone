@@ -7,9 +7,9 @@
 
   tasks:
     # Check if source dataset exists
-    - name: Check if GAMA09.QSAM exists
+    - name: Check if GAMA12.QSAM exists
       ibm.ibm_zos_core.zos_data_set:
-        name: GAMA09.QSAM
+        name: GAMA12.QSAM
         state: present
         type: seq
         record_format: fb
@@ -27,17 +27,17 @@
         var: qsam_check
 
     # Create sample data in source dataset if it was just created
-    - name: Add sample data to GAMA09.QSAM
+    - name: Add sample data to GAMA12.QSAM
       ibm.ibm_zos_core.zos_copy:
         content: |
           This is line 1 of sample data
           This is line 2 of sample data
           This is line 3 of sample data
           End of sample data
-        dest: GAMA09.QSAM
+        dest: GAMA12.QSAM
         force: true
       when: qsam_check.changed
 
     - name: Confirm source dataset is ready
       debug:
-        msg: "GAMA09.QSAM is ready for copying"
+        msg: "GAMA12.QSAM is ready for copying"

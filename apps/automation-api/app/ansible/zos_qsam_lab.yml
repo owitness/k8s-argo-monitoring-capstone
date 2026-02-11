@@ -18,8 +18,8 @@
     LIBPATH: "/usr/lpp/IBM/zoautil/lib:/usr/lpp/IBM/cyp/v3r9/pyz/lib:/lib:/usr/lib:."
 
   vars:
-    source_dataset: "GAMA09.QSAM1"
-    target_dataset: "GAMA09.QSAM2"
+    source_dataset: "GAMA12.QSAM1"
+    target_dataset: "GAMA12.QSAM2"
     jcl_local_path: "./jcl"
     fetch_dest: "/tmp/QSAM2_downloaded"
 
@@ -54,7 +54,7 @@
     - name: Copy JCL files to z/OS
       ibm.ibm_zos_core.zos_copy:
         src: "{{ item }}"
-        dest: "/tmp/ansible-gama09/{{ item | basename }}"
+        dest: "/tmp/ansible-GAMA12/{{ item | basename }}"
       loop:
         - "{{ jcl_local_path }}/CRQSAM1.jcl"
         - "{{ jcl_local_path }}/CRQSAM2.jcl"
@@ -62,7 +62,7 @@
 
     - name: Submit CRQSAM1 JCL
       ibm.ibm_zos_core.zos_job_submit:
-        src: "/tmp/ansible-gama09/CRQSAM1.jcl"
+        src: "/tmp/ansible-GAMA12/CRQSAM1.jcl"
         location: USS
         wait_time_s: 60
       register: crqsam1_result
@@ -75,7 +75,7 @@
 
     - name: Submit CRQSAM2 JCL
       ibm.ibm_zos_core.zos_job_submit:
-        src: "/tmp/ansible-gama09/CRQSAM2.jcl"
+        src: "/tmp/ansible-GAMA12/CRQSAM2.jcl"
         location: USS
         wait_time_s: 60
       register: crqsam2_result

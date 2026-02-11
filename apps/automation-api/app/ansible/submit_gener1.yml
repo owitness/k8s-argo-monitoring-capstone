@@ -10,7 +10,7 @@
   tasks:
     - name: Submit GENER1 JCL (force no-op encoding)
       ibm.ibm_zos_core.zos_job_submit:
-        src: "GAMA09.JCL(GENER1)"
+        src: "GAMA12.JCL(GENER1)"
         location: DATA_SET
         wait: true
         wait_time_s: 60

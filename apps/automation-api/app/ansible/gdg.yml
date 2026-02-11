@@ -8,7 +8,7 @@
   environment: "{{ zos_environment }}"
 
   vars:
-    gdg_name: "GAMA09.MY.GDG"
+    gdg_name: "GAMA12.MY.GDG"
     gdg_limit: 5
 
   tasks:

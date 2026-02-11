@@ -6,9 +6,9 @@
     - ibm.ibm_zos_core
   environment: "{{ environment_vars }}"
   vars:
-    gdg_base: GAMA09.TEST.GDG
-    model_dscb: GAMA09.MODEL.DSCB80
-    concat_ds: GAMA09.TEST.CONCAT
+    gdg_base: GAMA12.TEST.GDG
+    model_dscb: GAMA12.MODEL.DSCB80
+    concat_ds: GAMA12.TEST.CONCAT
     fetch_dest: /tmp/gdg_concat.txt
     
   tasks:

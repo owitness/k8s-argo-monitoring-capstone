@@ -15,7 +15,7 @@
           - dd_input:
               dd_name: SYSIN
               content: |-
-                 LISTCAT ENTRIES(GAMA09.TEST.GDG) ALL
+                 LISTCAT ENTRIES(GAMA12.TEST.GDG) ALL
           - dd_output:
               dd_name: SYSPRINT
               return_content:

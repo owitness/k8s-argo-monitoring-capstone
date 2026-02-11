@@ -19,8 +19,8 @@
 
   vars:
     jcl_local_path: "../jcl"  # Relative to ansible directory
-    source_dataset: "GAMA09.QSAM"
-    target_dataset: "GAMA09.QSAM2"
+    source_dataset: "GAMA12.QSAM"
+    target_dataset: "GAMA12.QSAM2"
 
   tasks:
     # ========================================
@@ -30,15 +30,15 @@
     - name: Copy CRQSAM1 JCL to z/OS USS
       ibm.ibm_zos_core.zos_copy:
         src: "{{ jcl_local_path }}/CRQSAM1"
-        dest: "/tmp/ansible-gama09/CRQSAM1.jcl"
+        dest: "/tmp/ansible-GAMA12/CRQSAM1.jcl"
         force: true
         encoding:
           from: ISO8859-1
           to: IBM-1047
 
-    - name: Submit CRQSAM1 JCL to create GAMA09.QSAM
+    - name: Submit CRQSAM1 JCL to create GAMA12.QSAM
       ibm.ibm_zos_core.zos_job_submit:
-        src: "/tmp/ansible-gama09/CRQSAM1.jcl"
+        src: "/tmp/ansible-GAMA12/CRQSAM1.jcl"
         location: USS
         wait_time_s: 30
       register: crqsam1_result
@@ -54,15 +54,15 @@
     - name: Copy CRQSAM2 JCL to z/OS USS
       ibm.ibm_zos_core.zos_copy:
         src: "{{ jcl_local_path }}/CRQSAM2"
-        dest: "/tmp/ansible-gama09/CRQSAM2.jcl"
+        dest: "/tmp/ansible-GAMA12/CRQSAM2.jcl"
         force: true
         encoding:
           from: ISO8859-1
           to: IBM-1047
 
-    - name: Submit CRQSAM2 JCL to create GAMA09.QSAM2
+    - name: Submit CRQSAM2 JCL to create GAMA12.QSAM2
       ibm.ibm_zos_core.zos_job_submit:
-        src: "/tmp/ansible-gama09/CRQSAM2.jcl"
+        src: "/tmp/ansible-GAMA12/CRQSAM2.jcl"
         location: USS
         wait_time_s: 30
       register: crqsam2_result

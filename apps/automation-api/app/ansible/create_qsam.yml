@@ -17,7 +17,7 @@
   tasks:
     - name: Set facts used in this playbook
       set_fact:
-        data_set_name: GAMA09.QSAM1
+        data_set_name: GAMA12.QSAM1
 
     - name: Delete data set if it exists
       zos_data_set:

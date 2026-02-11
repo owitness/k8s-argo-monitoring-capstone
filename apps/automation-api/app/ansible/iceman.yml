@@ -7,10 +7,10 @@
   environment: "{{ environment_vars }}"
 
   vars:
-    input_ds1: "GAMA09.LAB27.CITIES1"
-    input_ds2: "GAMA09.LAB27.CITIES2"
-    output_ds: "GAMA09.LAB27.SORTED.CITIES"
-    sysout_ds: "GAMA09.LAB27.ICEMAN.SYSOUT"
+    input_ds1: "GAMA12.LAB27.CITIES1"
+    input_ds2: "GAMA12.LAB27.CITIES2"
+    output_ds: "GAMA12.LAB27.SORTED.CITIES"
+    sysout_ds: "GAMA12.LAB27.ICEMAN.SYSOUT"
 
   tasks:
 

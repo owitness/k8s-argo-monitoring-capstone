@@ -18,11 +18,11 @@
           - dd_input:
               dd_name: SYSIN
               content: |
-                DELETE GAMA09.TEST.GDG GDG
+                DELETE GAMA12.TEST.GDG GDG
                 SET MAXCC = 0
                 IF LASTCC < 9 THEN -
                   DEFINE GDG ( -
-                    NAME(GAMA09.TEST.GDG) -
+                    NAME(GAMA12.TEST.GDG) -
                     LIMIT(50) -
                     NOEMPTY -
                     SCRATCH -
@@ -48,7 +48,7 @@
               content: |
                 SET MAXCC = 0
                 DEFINE NONVSAM ( -
-                  NAME(GAMA09.TEST.GDG.MODEL) -
+                  NAME(GAMA12.TEST.GDG.MODEL) -
                   RECORG(PS) -
                   LRECL(80) -
                   BLKSIZE(27920) -

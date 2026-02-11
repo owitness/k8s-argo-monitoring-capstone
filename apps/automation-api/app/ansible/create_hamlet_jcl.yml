@@ -1,0 +1,22 @@
+---
+- name: Submit Hamlet JCL (GENER3) to z/OS
+  hosts: zos_host
+  gather_facts: no
+  collections:
+    - ibm.ibm_zos_core
+  environment: "{{ environment_vars }}"
+
+  tasks:
+    - name: Submit JCL job from local file
+      ibm.ibm_zos_core.zos_job_submit:
+        src: "{{ playbook_dir }}/GENER3"
+        location: LOCAL
+        wait_time_s: 60
+        return_output: true
+      register: job_output
+
+    - name: Write JCL job result to file for API
+      ansible.builtin.copy:
+        content: "{{ job_output | to_nice_json }}"
+        dest: "{{ playbook_dir }}/jcl_result.json"
+      delegate_to: localhost

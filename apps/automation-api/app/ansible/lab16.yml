@@ -19,7 +19,7 @@
   tasks:
     - name: Conditionally delete and create the VB QSAM data set
       zos_data_set:
-        name: GAMA09.LAB16.VB.QSAM
+        name: GAMA12.LAB16.VB.QSAM
         state: present
         type: seq
         replace: true
