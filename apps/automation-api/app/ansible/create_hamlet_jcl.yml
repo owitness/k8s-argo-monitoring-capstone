@@ -10,7 +10,7 @@
     - name: Submit JCL job from local file
       ibm.ibm_zos_core.zos_job_submit:
         src: "{{ playbook_dir }}/GENER3"
-        location: local
+        location: LOCAL
         wait_time_s: 60
         return_output: true
       register: job_output
