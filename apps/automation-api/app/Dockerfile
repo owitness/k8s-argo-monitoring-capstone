@@ -12,7 +12,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Install Ansible collections during build
-RUN ansible-galaxy collection install ibm.ibm_zos_core==1.9.0 --upgrade
+RUN ansible-galaxy collection install ibm.ibm_zos_core==1.8.0 --upgrade
 
 COPY main.py .
 COPY ansible ./ansible
