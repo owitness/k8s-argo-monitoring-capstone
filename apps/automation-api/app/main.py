@@ -5,13 +5,12 @@ import boto3
 import subprocess
 import tempfile
 import os
+import shutil
 import logging
 import yaml
 from jinja2 import Environment, BaseLoader
 from pathlib import Path
 from typing import Optional, Dict
-import os
-import shutil
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -139,51 +138,51 @@ async def run_jcl(
     job_id = str(uuid.uuid4())[:8]
     
     try:
-    # Create temporary directory for downloaded files
-    with tempfile.TemporaryDirectory() as tmpdir:
-        logger.info(f"[{job_id}] Created temporary directory: {tmpdir}")
+            # Create temporary directory for downloaded files
+        with tempfile.TemporaryDirectory() as tmpdir:
+            logger.info(f"[{job_id}] Created temporary directory: {tmpdir}")
 
-        # Create subdirectories to maintain structure
-        jcl_tmpdir = os.path.join(tmpdir, "jcl")
-        os.makedirs(jcl_tmpdir, exist_ok=True)
+            # Create subdirectories to maintain structure
+            jcl_tmpdir = os.path.join(tmpdir, "jcl")
+            os.makedirs(jcl_tmpdir, exist_ok=True)
 
-        # Construct S3 paths
-        playbook_s3_path = f"{s3_prefix}{playbook_name}".lstrip("/")
-        inventory_s3_path = f"{s3_prefix}{inventory_name}".lstrip("/")
-        jcl_s3_path = f"{s3_prefix}jcl/{jcl_file}".lstrip("/")
+            # Construct S3 paths
+            playbook_s3_path = f"{s3_prefix}{playbook_name}".lstrip("/")
+            inventory_s3_path = f"{s3_prefix}{inventory_name}".lstrip("/")
+            jcl_s3_path = f"{s3_prefix}jcl/{jcl_file}".lstrip("/")
 
-        # Local paths
-        playbook_local = os.path.join(tmpdir, os.path.basename(playbook_name))
-        inventory_local = os.path.join(tmpdir, inventory_name)
-        jcl_local = os.path.join(jcl_tmpdir, jcl_file)
+            # Local paths
+            playbook_local = os.path.join(tmpdir, os.path.basename(playbook_name))
+            inventory_local = os.path.join(tmpdir, inventory_name)
+            jcl_local = os.path.join(jcl_tmpdir, jcl_file)
 
-        # Download playbook from S3
-        logger.info(f"[{job_id}] Downloading playbook from S3: {playbook_s3_path}")
-        download_from_s3(S3_BUCKET, playbook_s3_path, playbook_local)
+            # Download playbook from S3
+            logger.info(f"[{job_id}] Downloading playbook from S3: {playbook_s3_path}")
+            download_from_s3(S3_BUCKET, playbook_s3_path, playbook_local)
 
-        # Download inventory from S3
-        logger.info(f"[{job_id}] Downloading inventory from S3: {inventory_s3_path}")
-        download_from_s3(S3_BUCKET, inventory_s3_path, inventory_local)
+            # Download inventory from S3
+            logger.info(f"[{job_id}] Downloading inventory from S3: {inventory_s3_path}")
+            download_from_s3(S3_BUCKET, inventory_s3_path, inventory_local)
 
-        # Download JCL file from S3
-        logger.info(f"[{job_id}] Downloading JCL file from S3: {jcl_s3_path}")
-        download_from_s3(S3_BUCKET, jcl_s3_path, jcl_local)
+            # Download JCL file from S3
+            logger.info(f"[{job_id}] Downloading JCL file from S3: {jcl_s3_path}")
+            download_from_s3(S3_BUCKET, jcl_s3_path, jcl_local)
 
-        # Copy the JCL file to where the playbook expects it
-        target_dir = os.path.join(os.getcwd(), "../jcl")
-        os.makedirs(target_dir, exist_ok=True)
-        target_path = os.path.join(target_dir, jcl_file)
+            # Copy the JCL file to where the playbook expects it
+            target_dir = os.path.join(os.getcwd(), "../jcl")
+            os.makedirs(target_dir, exist_ok=True)
+            target_path = os.path.join(target_dir, jcl_file)
 
-        shutil.copy(jcl_local, target_path)
-        logger.info(f"[{job_id}] Copied JCL to {target_path}")
+            shutil.copy(jcl_local, target_path)
+            logger.info(f"[{job_id}] Copied JCL to {target_path}")
 
-        # Now run your playbook
-        logger.info(f"[{job_id}] Executing ansible-playbook")
-        execution_result = await execute_ansible_playbook(
-            playbook_local,
-            inventory_local,
-            tmpdir  # Pass tmpdir so vars can be written there
-        )
+            # Now run your playbook
+            logger.info(f"[{job_id}] Executing ansible-playbook")
+            execution_result = await execute_ansible_playbook(
+                playbook_local,
+                inventory_local,
+                tmpdir  # Pass tmpdir so vars can be written there
+            )
             
             return JSONResponse({
                 "job_id": job_id,
