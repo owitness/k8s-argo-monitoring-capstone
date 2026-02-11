@@ -69,7 +69,7 @@ pipelining = True
 """)
         # Run the ansible-playbook command with cwd=tmpdir
         # Build extra vars if needed
-        extra_vars = "ansible_remote_tmp=/tmp/ansible_tmp ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
+        extra_vars = "ansible_remote_tmp=/tmp/ansible-gama12 ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
         command = [
             "ansible-playbook",
             "-i", inventory_path,
@@ -132,7 +132,7 @@ async def run_jcl(
             download_from_s3(S3_BUCKET, key_s3_path, local_key_path)
             os.chmod(local_key_path, stat.S_IRUSR | stat.S_IWUSR)
 
-            # Build inventory
+            # Build inventory (key from S3 at local_key_path, user GAMA12)
             inventory_dict = {
                 'all': {
                     'children': {
@@ -141,8 +141,12 @@ async def run_jcl(
                                 'mainframe': {
                                     'ansible_host': '67.217.62.83',
                                     'ansible_user': 'GAMA12',
-                                    'ansible_python_interpreter': '/usr/lpp/IBM/cyp/v3r11/pyz/bin/python',
-                                    'ansible_ssh_private_key_file': local_key_path
+                                    'ansible_connection': 'ssh',
+                                    'ansible_ssh_private_key_file': local_key_path,
+                                    'ansible_ssh_common_args': '-o StrictHostKeyChecking=no',
+                                    'ansible_python_interpreter': '/usr/lpp/IBM/cyp/v3r11/pyz/bin/python3',
+                                    'ansible_pipelining': True,
+                                    'ansible_remote_tmp': '/tmp/ansible-gama12'
                                 }
                             }
                         }
