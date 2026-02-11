@@ -169,8 +169,6 @@ async def run_jcl(
                 "jcl_file": jcl_file,
                 "jcl_local_path": jcl_local,
                 "s3_bucket": S3_BUCKET,
-                "variables_loaded": list(var_data.keys()),
-                "variables_count": len(merged_vars),
                 "success": execution_result["success"],
                 "exit_code": execution_result["exit_code"],
                 "execution_id": execution_result["execution_id"],
