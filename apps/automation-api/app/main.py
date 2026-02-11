@@ -47,36 +47,46 @@ async def execute_ansible_playbook(
 ) -> Dict:
     """
     Execute Ansible playbook and capture output
-    
-    If extra_vars contains complex types (dicts), they will be saved to a varsfile
-    and passed to ansible using -e @varsfile.yml
     """
     execution_id = str(uuid.uuid4())[:8]
     logger.info(f"[{execution_id}] Starting playbook execution")
-    
     try:
-        # Build extra vars string to set remote_tmp and disable host key checking
-        extra_vars = "ansible_remote_tmp=/tmp/ansible_tmp ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
-        
-        # Build ansible-playbook command
-        command = [
-            "ansible-playbook",
-            "-i", inventory_path,
-            playbook_path,
-            "-e", extra_vars
-        ]
-        
-        # Execute the playbook
-        result = subprocess.run(
-            command,
-            capture_output=True,
-            text=True,
-            timeout=1800  # 30-minute timeout
-        )
-        
+        # Create ansible.cfg in tmpdir
+        ansible_cfg_path = os.path.join(tmpdir, 'ansible.cfg')
+        with open(ansible_cfg_path, 'w') as f:
+            f.write("""[defaults]
+forks = 25
+environment = LANG=en_US.UTF-8,LC_ALL=en_US.UTF-8
+host_key_checking = False
+
+[ssh_connection]
+pipelining = True
+""")
+        # Change working directory to tmpdir
+        cwd = os.getcwd()
+        os.chdir(tmpdir)
+        try:
+            # Build extra vars string
+            extra_vars = "ansible_remote_tmp=/tmp/ansible_tmp ansible_ssh_common_args='-o StrictHostKeyChecking=no'"
+            # Build command
+            command = [
+                "ansible-playbook",
+                "-i", inventory_path,
+                playbook_path,
+                "-e", extra_vars
+            ]
+            # Run subprocess in tmpdir
+            result = subprocess.run(
+                command,
+                capture_output=True,
+                text=True,
+                timeout=1800
+            )
+        finally:
+            os.chdir(cwd)
+
         success = result.returncode == 0
-        logger.info(f"[{execution_id}] Playbook execution completed with exit code: {result.returncode}")
-        
+        logger.info(f"[{execution_id}] Playbook completed with exit code: {result.returncode}")
         return {
             "execution_id": execution_id,
             "success": success,
@@ -84,7 +94,6 @@ async def execute_ansible_playbook(
             "stdout": result.stdout,
             "stderr": result.stderr
         }
-    
     except subprocess.TimeoutExpired:
         logger.error(f"[{execution_id}] Playbook timed out")
         raise HTTPException(
@@ -94,6 +103,7 @@ async def execute_ansible_playbook(
     except Exception as e:
         logger.error(f"[{execution_id}] Error executing playbook: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Playbook execution failed: {str(e)}")
+
 
 # JCL Endpoint
 @app.post("/run-jcl")
