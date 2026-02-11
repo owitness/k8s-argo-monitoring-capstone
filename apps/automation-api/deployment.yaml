@@ -1,3 +1,4 @@
+# Deployment with Prometheus annotations
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,10 +18,49 @@ spec:
         prometheus.io/port: "8000"
         prometheus.io/path: "/metrics"
     spec:
-      serviceAccountName: s3-sa 
+      serviceAccountName: s3-sa
       containers:
       - name: api
         image: dhricko9/automation-api:1.0.9
         workingDir: /app
         ports:
         - containerPort: 8000
+
+---
+# Service to expose the Deployment
+apiVersion: v1
+kind: Service
+metadata:
+  name: automation-api
+  namespace: api
+  labels:
+    app: automation-api
+spec:
+  selector:
+    app: automation-api
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8000
+
+---
+# ServiceMonitor for Prometheus Operator
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: automation-api
+  namespace: api
+  labels:
+    app: automation-api
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: automation-api
+  endpoints:
+    - port: http
+      interval: 15s
+      path: /metrics
+  namespaceSelector:
+    matchNames:
+      - api
