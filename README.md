@@ -90,6 +90,31 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 ```
 Open: https://localhost:8080
 
+## Verify automation-api in Prometheus
+
+The automation-api is configured so Prometheus scrapes its `/metrics` endpoint. To confirm it appears:
+
+1. **Sync the repo Argo CD uses**  
+   Argo CD points at `LetsgoPens87/k8s-argo-monitoring` (see `apps/argocd-apps/prometheus.yaml`). Ensure your `apps/prometheus/values.yaml` (with the `scrapeConfigs.automation-api` job) and `apps/automation-api/deployment.yaml` (Service annotations) are in that repo and synced (e.g. push to main and refresh the Prometheus app in Argo CD).
+
+2. **Open Prometheus config**  
+   ```bash
+   kubectl -n monitoring port-forward svc/prometheus-server 9090:80
+   ```  
+   In the browser: http://localhost:9090 → **Status** → **Configuration**. Search for `automation-api`. You should see a scrape job with `job_name: automation-api` and target `automation-api.api.svc.cluster.local:80`.
+
+3. **Check targets**  
+   **Status** → **Targets**. Look for job **automation-api** (or a target with label `service="automation-api"`). State should be **UP**.
+
+4. **If the target is missing or DOWN**  
+   - Confirm automation-api is running: `kubectl get pods -n api -l app=automation-api`  
+   - Confirm the Service exists: `kubectl get svc automation-api -n api`  
+   - From inside the cluster, test metrics: `kubectl run -it --rm curl --image=curlimages/curl --restart=Never -- curl -s http://automation-api.api.svc.cluster.local/metrics | head -5`  
+   - Re-sync the Prometheus application in Argo CD so the updated scrape config is applied; restart the Prometheus pod if the config changed but targets did not update.
+
+5. **Query in Prometheus**  
+   In **Graph**, run: `up{job="automation-api"}`. A value of `1` means the automation-api target is being scraped.
+
 ## Build, test with Docker, and deploy (GitHub Actions → Argo CD)
 
 Use this flow to test the **automation-api** image locally, then push so GitHub Actions builds and pushes to Docker Hub; Argo CD (and Image Updater) will pick up the new image.
