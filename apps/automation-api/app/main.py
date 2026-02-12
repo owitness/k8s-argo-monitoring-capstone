@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import uuid
+from datetime import datetime
 from fastapi import FastAPI, HTTPException
 import ansible_runner
 
@@ -11,6 +13,9 @@ app = FastAPI()
 
 # Resolve ansible dir relative to this file so it works locally and in Docker
 ANSIBLE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "ansible")
+
+# In-memory last JCL run summary (job_id, success, timestamp); cleared on restart
+_last_jcl_run: dict | None = None
 
 
 @app.get("/ping")
@@ -41,6 +46,7 @@ def ping():
 
 @app.post("/run-jcl")
 def run_jcl():
+    job_id = uuid.uuid4().hex[:8]
     try:
         out, err, rc = ansible_runner.run_command(
             executable_cmd="ansible-playbook",
@@ -76,10 +82,36 @@ def run_jcl():
             "stdout": out or "",
             "stderr": err or "",
             "job": job,
+            "job_id": job_id,
         }
         if job_load_error is not None:
             result["job_load_error"] = job_load_error
+        global _last_jcl_run
+        _last_jcl_run = {
+            "job_id": job_id,
+            "success": ok,
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z",
+        }
         return result
     except Exception as e:
         logger.exception("run-jcl failed: %s", e)
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/jcl/status")
+def jcl_status():
+    """Return last JCL run summary (job_id, success, timestamp)."""
+    if _last_jcl_run is not None:
+        return _last_jcl_run
+    return {
+        "job_id": None,
+        "success": None,
+        "timestamp": None,
+        "message": "No run yet",
+    }
+
+
+@app.post("/re-run-jcl")
+def re_run_jcl():
+    """Re-run the same JCL workflow as POST /run-jcl; same response shape."""
+    return run_jcl()
