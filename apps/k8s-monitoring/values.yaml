@@ -10,7 +10,7 @@ k8s-monitoring:
       url: http://prometheus-server.prometheus.svc.cluster.local:80/api/v1/write
     - name: loki
       type: loki
-      url: http://loki.monitoring.svc:3100/loki/api/v1/push
+      url: http://loki.loki.svc.cluster.local:3100/loki/api/v1/push
 
   # Collectors - enable Alloy instances
   alloy-metrics:

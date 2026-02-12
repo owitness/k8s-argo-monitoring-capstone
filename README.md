@@ -71,6 +71,8 @@ Watch sync status:
 kubectl get applications -n argocd
 ```
 
+**Convention:** Each Argo CD app deploys to a namespace that **matches its name** (e.g. app `grafana` → namespace `grafana`, app `prometheus` → namespace `prometheus`). So when you see an app in Argo CD, use that same name with `kubectl -n <app-name>`.
+
 ## 5. Get Endpoints
 
 ### Prometheus
@@ -81,8 +83,11 @@ Or list services and use the one of type LoadBalancer: `kubectl get svc -n prome
 **Note:** The LoadBalancer hostname can change after a redeploy or namespace change (e.g. switching from `monitoring` to `prometheus`). If the old URL returns "site can't be reached" or DNS_PROBE_FINISHED_NXDOMAIN, run the command above to get the current URL.
 
 ### Grafana
+Argo CD app **grafana** deploys to namespace **grafana** (app name = namespace).
 ```bash
-kubectl get svc grafana-lb -n grafana -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+kubectl get svc -n grafana -o wide | grep -i grafana
+# or get LoadBalancer hostname:
+kubectl get svc -n grafana -l app.kubernetes.io/name=grafana -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}'
 ```
 Default credentials: `admin` / `admin`
 
@@ -230,6 +235,31 @@ kubectl run curl-debug --rm -it --restart=Never --image=curlimages/curl -n api -
 cd apps/prometheus && helm dependency update -q && helm template prometheus . 2>/dev/null | grep -q "job_name: automation-api" && echo "LOCAL: automation-api in rendered config" || echo "LOCAL: automation-api MISSING"
 cd ../..
 kubectl get configmap -n prometheus -l app.kubernetes.io/name=prometheus -o yaml 2>/dev/null | grep -q "automation-api" && echo "CLUSTER: automation-api in Prometheus ConfigMap" || echo "CLUSTER: automation-api MISSING"
+```
+
+### 6. Find Grafana datasource config
+
+Argo CD app **grafana** deploys to namespace **grafana** (so app name and namespace match). If you still see the old Prometheus URL in Grafana:
+
+```bash
+# List ConfigMaps in grafana namespace
+kubectl get configmap -n grafana -o name
+
+# Find which ConfigMap has the Prometheus URL
+for cm in $(kubectl get configmap -n grafana -o jsonpath='{.items[*].metadata.name}'); do
+  if kubectl get configmap "$cm" -n grafana -o yaml | grep -q 'prometheus-server.monitoring'; then
+    echo "FOUND: $cm"
+    kubectl get configmap "$cm" -n grafana -o yaml | grep -E 'url:|prometheus|monitoring' | head -15
+  fi
+done
+```
+
+Edit that ConfigMap and change `prometheus-server.monitoring.svc.cluster.local` to `prometheus-server.prometheus.svc.cluster.local`, then restart Grafana:
+
+```bash
+kubectl edit configmap <CONFIGMAP_NAME> -n grafana
+kubectl rollout restart deployment -n grafana -l app.kubernetes.io/name=grafana
+# or: kubectl rollout restart statefulset -n grafana -l app.kubernetes.io/name=grafana
 ```
 
 ## Build, test with Docker, and deploy (GitHub Actions → Argo CD)
