@@ -36,3 +36,16 @@ prometheus:
       limits:
         cpu: 500m
         memory: 1Gi
+
+  # Scrape automation-api in namespace api so it appears in Prometheus
+  scrapeConfigs:
+    automation-api:
+      enabled: true
+      job_name: automation-api
+      metrics_path: /metrics
+      static_configs:
+        - targets:
+            - automation-api.api.svc.cluster.local:80
+          labels:
+            namespace: api
+            service: automation-api

@@ -35,6 +35,10 @@ metadata:
   namespace: api
   labels:
     app: automation-api
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "80"
+    prometheus.io/path: "/metrics"
 spec:
   selector:
     app: automation-api
