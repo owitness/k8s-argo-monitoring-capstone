@@ -75,7 +75,7 @@ kubectl get applications -n argocd
 
 ### Grafana
 ```bash
-kubectl get svc grafana-lb -n monitoring -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+kubectl get svc grafana-lb -n grafana -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 Default credentials: `admin` / `admin`
 
@@ -95,7 +95,7 @@ Open: https://localhost:8080
 The automation-api is configured so Prometheus scrapes its `/metrics` endpoint. To confirm it appears:
 
 1. **If the automation-api job is missing from the live config**  
-   If `kubectl get configmap -n monitoring -l app.kubernetes.io/name=prometheus -o yaml | grep -A 20 automation-api` returns nothing, the job is not in the live Prometheus config. Check in order:
+   If `kubectl get configmap -n prometheus -l app.kubernetes.io/name=prometheus -o yaml | grep -A 20 automation-api` returns nothing, the job is not in the live Prometheus config. Check in order:
 
    - **Repo and sync**  
      Argo CD uses `LetsgoPens87/k8s-argo-monitoring` at `apps/prometheus` (see `apps/argocd-apps/prometheus.yaml`). Ensure that repo’s `apps/prometheus/values.yaml` contains the `scrapeConfigs.automation-api` block (or the `extraScrapeConfigs` block from the same file). Push from this (capstone) repo if needed, then in Argo CD: **Refresh** the Prometheus application and **Sync**.
@@ -112,9 +112,12 @@ The automation-api is configured so Prometheus scrapes its `/metrics` endpoint. 
 
 2. **Open Prometheus config**  
    ```bash
-   kubectl -n monitoring port-forward svc/prometheus-server 9090:80
+   kubectl -n prometheus port-forward svc/prometheus-server 9090:80
    ```  
-   In the browser: http://localhost:9090 → **Status** → **Configuration**. Search for `automation-api`. You should see a scrape job with `job_name: automation-api` and target `automation-api.api.svc.cluster.local:80`.
+   In the browser: http://localhost:9090 → **Status** → **Configuration**. Search for `automation-api`.
+
+   - **If you see it:** There will be a scrape block like `job_name: automation-api` with `metrics_path: /metrics` and `static_configs` targeting `automation-api.api.svc.cluster.local:80`. You’re good.
+   - **If you don’t:** The config will only list default jobs (`prometheus`, `kubernetes-apiservers`, `kubernetes-nodes`, `kubernetes-service-endpoints`, `kubernetes-pods`, etc.) and no `automation-api`. That means the scrape config from `apps/prometheus/values.yaml` is not in the repo Argo CD syncs from, or the app hasn’t synced. Follow **§ Debugging & verification commands** below (especially steps 1–3).
 
 3. **Check targets**  
    **Status** → **Targets**. Look for job **automation-api** (or a target with label `service="automation-api"`). State should be **UP**.
@@ -127,6 +130,19 @@ The automation-api is configured so Prometheus scrapes its `/metrics` endpoint. 
 
 5. **Query in Prometheus**  
    In **Graph**, run: `up{job="automation-api"}`. A value of `1` means the automation-api target is being scraped.
+
+## Where is the Prometheus config? (no node changes)
+
+You do **not** need to change any config on the actual node. The flow is:
+
+1. **Git repo** (e.g. `LetsgoPens87/k8s-argo-monitoring`) → `apps/prometheus/values.yaml` is the source of truth.
+2. **Argo CD** syncs the Prometheus app: it runs Helm with that repo’s `apps/prometheus` (Chart + values) and produces Kubernetes manifests.
+3. **One of those manifests is a ConfigMap** in the **prometheus** namespace. That ConfigMap holds the rendered `prometheus.yml` (including `scrape_configs`).
+4. The **Prometheus server pod** mounts that ConfigMap as a file inside the container. Prometheus reads the file from the mount; nothing is stored on the host node.
+
+So: fix the **values in the repo** and **sync the Prometheus application**. Argo CD updates the ConfigMap; the pod’s config is whatever is in that ConfigMap (and configmap-reload may reload it, or a pod restart picks it up). No SSH or node-level edits.
+
+If the repo is correct and you’ve synced but the UI still doesn’t show the automation-api job, the next step is to confirm that the **ConfigMap** in the cluster was actually updated by the sync (see below).
 
 ## Debugging & verification commands
 
@@ -165,13 +181,27 @@ If you see a `job_name: automation-api` block, your local `values.yaml` is corre
 kubectl get application prometheus -n argocd -o wide
 
 # Full Prometheus config in the cluster (search for automation-api)
-kubectl get configmap -n monitoring -l app.kubernetes.io/name=prometheus -o yaml | grep -A 25 "automation-api" || echo "automation-api NOT in live ConfigMap"
+kubectl get configmap -n prometheus -l app.kubernetes.io/name=prometheus -o yaml | grep -A 25 "automation-api" || echo "automation-api NOT in live ConfigMap"
 
 # Prometheus server pod (restart if config changed but targets didn’t)
-kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus
+kubectl get pods -n prometheus -l app.kubernetes.io/name=prometheus
 ```
 
-If the ConfigMap has no `automation-api`, either the synced repo doesn’t have the scrape config or the app hasn’t synced. Refresh + Sync in Argo CD, then re-run the ConfigMap grep.
+If the ConfigMap has no `automation-api`, either the synced repo doesn’t have the scrape config or the app hasn’t synced. If the grep above finds nothing, the config Argo CD applied doesn't include the job. Find which ConfigMap holds `prometheus.yml` and inspect it:
+
+```bash
+# List ConfigMap names and which have prometheus.yml
+kubectl get configmap -n prometheus -o jsonpath='{range .items[*]}{.metadata.name}{"\n"}{end}' | while read name; do
+  if kubectl get configmap "$name" -n prometheus -o jsonpath='{.data}' 2>/dev/null | grep -q prometheus.yml; then
+    echo "$name has prometheus.yml"
+  fi
+done
+
+# Inspect that ConfigMap (replace PROMETHEUS_CM with the name from above)
+kubectl get configmap PROMETHEUS_CM -n prometheus -o jsonpath='{.data.prometheus\.yml}' | grep -A 15 "automation-api" || echo "automation-api not in this ConfigMap"
+```
+
+If that ConfigMap still has no `automation-api`, the Helm render from the synced repo isn't producing it. In Argo CD, sync the **Prometheus** application specifically (not only the app-of-apps), then re-run the grep. If it still fails, run **§ 2** locally to confirm your values render the job, then ensure those exact values are in the repo and path Argo CD uses.
 
 ### 4. Is automation-api reachable from the cluster?
 
@@ -192,7 +222,7 @@ kubectl run curl-debug --rm -it --restart=Never --image=curlimages/curl -n api -
 # From repo root: render config, then check cluster
 cd apps/prometheus && helm dependency update -q && helm template prometheus . 2>/dev/null | grep -q "job_name: automation-api" && echo "LOCAL: automation-api in rendered config" || echo "LOCAL: automation-api MISSING"
 cd ../..
-kubectl get configmap -n monitoring -l app.kubernetes.io/name=prometheus -o yaml 2>/dev/null | grep -q "automation-api" && echo "CLUSTER: automation-api in Prometheus ConfigMap" || echo "CLUSTER: automation-api MISSING"
+kubectl get configmap -n prometheus -l app.kubernetes.io/name=prometheus -o yaml 2>/dev/null | grep -q "automation-api" && echo "CLUSTER: automation-api in Prometheus ConfigMap" || echo "CLUSTER: automation-api MISSING"
 ```
 
 ## Build, test with Docker, and deploy (GitHub Actions → Argo CD)
